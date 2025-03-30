@@ -2,7 +2,7 @@
   "name": "14-High! Card Game",
   "short_name": "14-High!",
   "description": "A scoring app for the 14-High card game",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#f9fafb",
   "theme_color": "#4f46e5",
