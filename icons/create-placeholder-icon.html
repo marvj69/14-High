@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Placeholder Icon</title>
+</head>
+<body>
+  <canvas id="icon192" width="192" height="192"></canvas>
+  <script>
+    // Create a simple icon for testing the PWA functionality
+    function createIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      
+      // Purple background
+      ctx.fillStyle = '#4f46e5';
+      ctx.fillRect(0, 0, size, size);
+      
+      // White card shape
+      ctx.fillStyle = 'white';
+      ctx.fillRect(size * 0.1, size * 0.1, size * 0.8, size * 0.8);
+      
+      // 14 text
+      ctx.fillStyle = '#4f46e5';
+      ctx.font = `bold ${size * 0.4}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('14', size / 2, size / 2);
+      
+      // Export the icon
+      const link = document.createElement('a');
+      link.download = `icon-${size}x${size}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+    
+    // Create the 192x192 icon (a common size)
+    const canvas192 = document.getElementById('icon192');
+    createIcon(canvas192);
+  </script>
+</body>
+</html> 

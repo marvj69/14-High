@@ -1,0 +1,2266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>14-High!</title>
+  <meta name="description" content="A card game scoring app for 14-High! Play offline with your friends.">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Modern CSS Reset and Base Styles */
+    :root {
+      --primary: #4f46e5; /* Indigo */
+      --primary-hover: #4338ca;
+      --secondary: #14b8a6; /* Teal */
+      --success: #22c55e; /* Green */
+      --success-hover: #16a34a;
+      --danger: #ef4444; /* Red */
+      --danger-hover: #dc2626;
+      --warning: #f59e0b; /* Amber */
+      --light: #ffffff;
+      --light-alt: #f9fafb; /* Very light gray */
+      --dark: #111827; /* Dark gray */
+      --dark-alt: #1f2937; /* Slightly lighter dark gray */
+      --gray: #6b7280; /* Medium gray */
+      --gray-light: #e5e7eb; /* Light gray */
+      --gray-dark: #374151; /* Darker gray */
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --radius: 0.375rem; /* 6px */
+      --transition: all 0.2s ease-in-out;
+      --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    /* Dark mode variables */
+    [data-theme="dark"] {
+      --primary: #6366f1; /* Lighter Indigo */
+      --primary-hover: #818cf8;
+      --secondary: #2dd4bf; /* Lighter Teal */
+      --success: #4ade80; /* Lighter Green */
+      --success-hover: #86efac;
+      --danger: #f87171; /* Lighter Red */
+      --danger-hover: #fda4af;
+      --warning: #fbbf24; /* Lighter Amber */
+      --light: #121212; /* Dark background */
+      --light-alt: #1e1e1e; /* Slightly lighter dark background */
+      --dark: #f8fafc; /* Light text */
+      --dark-alt: #e2e8f0; /* Slightly darker light text */
+      --gray: #94a3b8; /* Lighter gray */
+      --gray-light: #2c2c2c; /* Darker borders/dividers */
+      --gray-dark: #3a3a3a; /* Even darker elements */
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    }
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background-color: var(--light-alt);
+      color: var(--dark);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 1.5rem;
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 700px; /* Slightly narrower for a sleeker feel */
+      margin: 0 auto;
+    }
+
+    #app {
+      margin-top: 4rem; /* Space for fixed header */
+    }
+
+    /* Typography */
+    h1, h2, h3, h4 {
+      font-weight: 600;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+
+    h1 {
+      font-size: 2.25rem; /* Slightly larger */
+      font-weight: 700;
+      text-align: center;
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      margin: 0;
+      z-index: 900;
+      /* Simpler, more subtle gradient */
+      background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      /* Fallback for browsers that don't support background-clip: text */
+      color: var(--primary);
+      width: auto; /* Allow title to properly size itself */
+    }
+
+    /* Create a fixed header area for all fixed elements */
+    .fixed-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4rem; /* Match the margin-top for #app */
+      background-color: var(--light-alt);
+      z-index: 800;
+      box-shadow: var(--shadow);
+      transition: background-color 0.3s ease;
+    }
+
+    [data-theme="dark"] .fixed-header {
+      background-color: var(--light-alt);
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--dark);
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+      color: var(--gray);
+    }
+
+    /* Card styles */
+    .card {
+      background-color: var(--light);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--gray-light);
+      transition: var(--transition);
+    }
+
+    [data-theme="dark"] .card {
+      background-color: var(--light-alt);
+      border-color: var(--gray-dark);
+    }
+
+    /* Form elements */
+    .input-group {
+      display: flex;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    input, button {
+      font-size: 0.9375rem; /* Slightly smaller */
+      font-family: inherit;
+      transition: var(--transition);
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      flex-grow: 1;
+      padding: 0.625rem 0.875rem; /* Adjusted padding */
+      border: 1px solid var(--gray-light);
+      border-radius: var(--radius);
+      background-color: var(--light);
+      color: var(--dark);
+      outline: none;
+      box-shadow: var(--shadow-sm);
+    }
+
+    [data-theme="dark"] input[type="text"],
+    [data-theme="dark"] input[type="number"] {
+      background-color: var(--gray-dark);
+      border-color: var(--gray-dark);
+      color: var(--dark);
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3); /* Adjusted focus ring */
+    }
+
+    [data-theme="dark"] input[type="text"]:focus,
+    [data-theme="dark"] input[type="number"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4); /* Dark mode focus ring */
+    }
+
+    input[type="number"] {
+      width: 4.5rem; /* Slightly narrower */
+      text-align: center;
+      -moz-appearance: textfield; /* Hide spinners in Firefox */
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none; /* Hide spinners in Chrome, Safari, Edge */
+      margin: 0;
+    }
+
+    .input-with-button {
+      display: flex;
+      width: 100%;
+    }
+
+    .input-with-button input {
+      border-radius: var(--radius) 0 0 var(--radius);
+      border-right: none;
+    }
+
+    button {
+      padding: 0.625rem 1rem; /* Adjusted padding */
+      border: none;
+      border-radius: var(--radius);
+      background-color: var(--primary);
+      color: white;
+      cursor: pointer;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem; /* Gap between icon and text */
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px); /* Subtle lift */
+      box-shadow: var(--shadow-sm);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    button:disabled {
+      background-color: var(--gray-light);
+      color: var(--gray);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    [data-theme="dark"] button:disabled {
+        background-color: var(--gray-dark);
+        color: var(--gray);
+    }
+
+    .btn-add {
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    .btn-full {
+      display: block;
+      width: 100%;
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+    }
+
+    .btn-green {
+      background-color: var(--success);
+    }
+
+    .btn-green:hover:not(:disabled) {
+      background-color: var(--success-hover);
+    }
+
+    .btn-red {
+      background-color: var(--danger);
+    }
+
+    .btn-red:hover:not(:disabled) {
+      background-color: var(--danger-hover);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--gray-light);
+      color: var(--primary);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background-color: rgba(79, 70, 229, 0.05); /* Light primary background */
+      border-color: var(--primary);
+    }
+
+    [data-theme="dark"] .btn-outline {
+      border-color: var(--gray-dark);
+      color: var(--primary);
+    }
+
+    [data-theme="dark"] .btn-outline:hover:not(:disabled) {
+      background-color: rgba(99, 102, 241, 0.1);
+      border-color: var(--primary);
+    }
+
+    /* Player list */
+    .player-list {
+      margin: 0.75rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .player-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--light-alt);
+      padding: 0.625rem 1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--gray-light);
+      transition: var(--transition);
+    }
+
+    .player-item span {
+      font-weight: 500;
+    }
+
+    [data-theme="dark"] .player-item {
+      background-color: var(--light);
+      border-color: var(--gray-dark);
+    }
+
+    .btn-remove {
+      background: none;
+      color: var(--danger);
+      padding: 0.25rem; /* Smaller padding for icon button */
+      border-radius: 50%; /* Circular */
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-remove:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger-hover);
+      transform: none; /* No translate on hover for remove */
+      box-shadow: none;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--gray-light);
+      background-color: var(--light); /* Ensure background for container */
+    }
+
+    [data-theme="dark"] .table-container {
+      border-color: var(--gray-dark);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse; /* Use collapse for cleaner lines */
+      font-size: 0.9rem;
+    }
+
+    [data-theme="dark"] table {
+      background-color: var(--light-alt);
+    }
+
+    th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      background-color: var(--light-alt);
+      font-weight: 500; /* Lighter weight */
+      color: var(--gray);
+      text-transform: uppercase; /* Uppercase headers */
+      letter-spacing: 0.05em;
+      font-size: 0.75rem; /* Smaller header text */
+      border-bottom: 1px solid var(--gray-light);
+    }
+
+    td {
+      padding: 0.875rem 1rem; /* Increased padding for rows */
+      border-bottom: 1px solid var(--gray-light);
+      vertical-align: middle;
+      color: var(--dark);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none; /* Remove border from last row */
+    }
+
+    /* Remove alternating row colors for minimalism */
+    /* tr:nth-child(even) { background-color: var(--light-alt); } */
+
+    tbody tr:hover {
+      background-color: rgba(79, 70, 229, 0.03); /* Very subtle hover */
+    }
+
+    [data-theme="dark"] th {
+      background-color: var(--light);
+      border-bottom-color: var(--gray-dark);
+      color: var(--gray);
+    }
+
+    [data-theme="dark"] td {
+      border-bottom-color: var(--gray-dark);
+      color: var(--dark-alt);
+    }
+
+    [data-theme="dark"] tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    [data-theme="dark"] tbody tr:hover {
+      background-color: rgba(99, 102, 241, 0.05);
+    }
+
+    td:last-child {
+      font-weight: 600;
+    }
+
+    .winner-row {
+      background-color: rgba(34, 197, 94, 0.05) !important;
+      border-left: 3px solid var(--success);
+      position: relative;
+    }
+    .winner-row td:first-child {
+      padding-left: calc(1rem - 3px); /* Adjust padding because of border */
+    }
+
+    [data-theme="dark"] .winner-row {
+      background-color: rgba(74, 222, 128, 0.08) !important;
+    }
+
+    /* Winner display */
+    .winner-display {
+      margin-bottom: 2rem;
+      text-align: center;
+      background-color: var(--light-alt); /* Subtle background */
+      padding: 1.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--gray-light);
+    }
+
+    [data-theme="dark"] .winner-display {
+        background-color: var(--dark-alt);
+        border-color: var(--gray-dark);
+    }
+
+    .winner-display h3 {
+        color: var(--gray);
+        margin-bottom: 0.5rem;
+    }
+
+    .winner-name {
+      font-size: 1.5rem; /* Slightly smaller */
+      font-weight: 600;
+      color: var(--success);
+      margin-top: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .winner-name .fa-crown {
+        color: var(--warning);
+    }
+
+    /* Layout utilities */
+    .flex-between {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    }
+
+    .game-status {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 0.25rem 0.625rem;
+      border-radius: 100px;
+      background-color: rgba(79, 70, 229, 0.1); /* Primary subtle bg */
+      color: var(--primary);
+      margin-bottom: 0.5rem; /* Reduced from 1rem */
+    }
+
+    [data-theme="dark"] .game-status {
+        background-color: rgba(99, 102, 241, 0.15);
+        color: var(--primary);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.625rem;
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-left: 0.5rem;
+    }
+
+    .badge-blue {
+      background-color: rgba(79, 70, 229, 0.1);
+      color: var(--primary);
+    }
+
+    .badge-green {
+      background-color: rgba(34, 197, 94, 0.1);
+      color: var(--success);
+    }
+
+    [data-theme="dark"] .badge-blue {
+        background-color: rgba(99, 102, 241, 0.2);
+    }
+    [data-theme="dark"] .badge-green {
+        background-color: rgba(74, 222, 128, 0.2);
+    }
+
+    .trick-value {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start; /* Align input left in cell */
+    }
+
+    .score-value {
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    /* Hamburger menu styles */
+    .hamburger-menu {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 1000;
+    }
+
+    .hamburger-btn, .menu-close {
+      background: var(--light);
+      border: 1px solid var(--gray-light);
+      color: var(--gray);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%; /* Circular */
+      transition: var(--transition);
+      padding: 0;
+      font-size: 1rem; /* Adjust icon size */
+      box-shadow: var(--shadow);
+    }
+    .hamburger-btn:hover, .menu-close:hover {
+        background: var(--light-alt);
+        color: var(--primary);
+        transform: scale(1.05); /* Slight scale on hover */
+        box-shadow: var(--shadow-md);
+    }
+
+    [data-theme="dark"] .hamburger-btn,
+    [data-theme="dark"] .menu-close {
+        background: var(--light);
+        border-color: var(--gray-dark);
+        color: var(--gray);
+    }
+    [data-theme="dark"] .hamburger-btn:hover,
+    [data-theme="dark"] .menu-close:hover {
+        background: var(--light-alt);
+        color: var(--primary);
+    }
+
+
+    .menu-content {
+      position: fixed;
+      top: 0;
+      left: -250px; /* Start off-screen - reduced from 300px */
+      width: 250px; /* Reduced from 300px */
+      height: 100%;
+      background-color: var(--light);
+      box-shadow: var(--shadow-md);
+      transition: left 0.3s ease;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--gray-light);
+    }
+
+    [data-theme="dark"] .menu-content {
+      background-color: var(--light-alt);
+      border-right-color: var(--gray-dark);
+    }
+
+    .menu-content.active {
+      left: 0;
+    }
+
+    .menu-header {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 1.5rem;
+        padding-top: 0.5rem;
+    }
+
+    .menu-close {
+      /* Removed absolute positioning, now part of flow */
+    }
+
+    .menu-item-header {
+      padding: 0.5rem 0;
+      margin: 1rem 0 0.5rem 0;
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--gray-light);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    [data-theme="dark"] .menu-item-header {
+      border-color: var(--gray-dark);
+      color: var(--gray);
+    }
+
+    .menu-item {
+      padding: 0.75rem 0.5rem; /* Adjusted padding */
+      margin: 0.25rem 0;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .menu-item span {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .menu-item:hover {
+      background-color: var(--light-alt);
+    }
+
+    [data-theme="dark"] .menu-item:hover {
+      background-color: var(--light);
+    }
+
+    .completed-games-list {
+      flex-grow: 1; /* Allow list to fill available space */
+      overflow-y: auto;
+      margin: 0.5rem 0;
+      padding-right: 0.5rem; /* Space for scrollbar */
+    }
+    /* Custom scrollbar (optional) */
+    .completed-games-list::-webkit-scrollbar { width: 6px; }
+    .completed-games-list::-webkit-scrollbar-track { background: transparent; }
+    .completed-games-list::-webkit-scrollbar-thumb { background: var(--gray-light); border-radius: 3px; }
+    [data-theme="dark"] .completed-games-list::-webkit-scrollbar-thumb { background: var(--gray-dark); }
+
+
+    .completed-game-item {
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      background-color: var(--light-alt);
+      border-radius: var(--radius);
+      border-left: 3px solid var(--primary);
+      transition: var(--transition);
+      font-size: 0.85rem;
+    }
+
+    .completed-game-item:hover {
+      transform: translateX(3px);
+      background-color: var(--light);
+      box-shadow: var(--shadow-sm);
+    }
+
+    [data-theme="dark"] .completed-game-item {
+      background-color: var(--light);
+      border-color: var(--primary);
+    }
+
+    [data-theme="dark"] .completed-game-item:hover {
+      background-color: var(--light-alt);
+    }
+
+    .completed-game-item div {
+      margin: 0.2rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--gray);
+    }
+    .completed-game-item div i {
+        width: 14px; /* Align icons */
+        text-align: center;
+    }
+
+    .game-winner {
+      color: var(--success) !important; /* Important needed to override general color */
+      font-weight: 500;
+    }
+
+    .game-score {
+      color: var(--primary) !important; /* Important needed */
+      font-weight: 500;
+    }
+
+    [data-theme="dark"] .game-winner { color: var(--success) !important; }
+    [data-theme="dark"] .game-score { color: var(--primary) !important; }
+
+    .no-games {
+      padding: 1rem;
+      text-align: center;
+      color: var(--gray);
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+
+    /* Toggle switch */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 40px; /* Smaller size */
+      height: 22px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--gray-light);
+      transition: .3s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px; /* Smaller knob */
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: var(--shadow-sm);
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px); /* Adjusted translate */
+    }
+
+    [data-theme="dark"] .slider {
+        background-color: var(--gray-dark);
+    }
+
+    /* Game Info / Validation Messages */
+    .game-info {
+      margin-bottom: 0.75rem; /* Reduced from 1rem */
+      padding: 0.5rem 1rem; /* Reduced vertical padding from 0.625rem */
+      background-color: var(--light-alt);
+      border-radius: var(--radius);
+      border: 1px solid var(--gray-light);
+      color: var(--gray);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    [data-theme="dark"] .game-info {
+      background-color: var(--light);
+      border-color: var(--gray-dark);
+    }
+
+    .game-info.bid-warning {
+        border-left: 3px solid var(--danger);
+        color: var(--danger);
+        background-color: rgba(239, 68, 68, 0.05);
+    }
+    [data-theme="dark"] .game-info.bid-warning {
+        background-color: rgba(248, 113, 113, 0.1);
+    }
+
+    /* Elimination notification banner */
+    .elimination-banner {
+      background-color: var(--primary);
+      color: white;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius);
+      font-weight: 500;
+      box-shadow: var(--shadow);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      animation: fadeIn 0.3s ease-in-out;
+      border: 1px solid rgba(0,0,0,0.1);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    /* Original fixed position banner styling kept for compatibility */
+    #elimination-banner {
+      position: fixed;
+      top: 4.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 850;
+    }
+
+    /* New inline banner styling */
+    #round-elimination-banner {
+      /* No position:fixed here so it stays with the content */
+      z-index: 100;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -10px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    [data-theme="dark"] .elimination-banner {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .elimination-banner i {
+      font-size: 0.7rem;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.75rem; /* Consistent gap */
+      flex-wrap: wrap;
+    }
+
+    /* Final tweaks for spacing and alignment */
+    .flex-between > p { /* Style for the "Round X of 14" text */
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 0.25rem; /* Align better with buttons if wrapped */
+    }
+
+    /* Remove default focus outline, using box-shadow instead */
+    *:focus {
+        outline: none;
+    }
+    /* Add explicit focus-visible for keyboard navigation */
+    *:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+        border-radius: var(--radius);
+    }
+    input:focus-visible, button:focus-visible, .toggle-switch:focus-within {
+        outline: none; /* Use box-shadow for these elements */
+    }
+    button:focus-visible {
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.4);
+    }
+    [data-theme="dark"] button:focus-visible {
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
+    }
+
+    /* Responsive design adjustments */
+    @media (max-width: 640px) { /* Adjusted breakpoint */
+      body {
+        padding: 1rem;
+      }
+
+      h1 {
+        font-size: 1.875rem;
+        width: 60%; /* Limit width on mobile */
+      }
+
+      .card {
+        padding: 1.25rem;
+      }
+
+      .flex-between {
+        flex-direction: column;
+        align-items: stretch; /* Stretch items full width */
+      }
+      .flex-between > .button-group {
+        width: 100%;
+        justify-content: center;
+      }
+      .flex-between > p {
+        text-align: center;
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      /* Ensure table cells don't get too cramped */
+      th, td {
+        padding: 0.75rem 0.75rem;
+      }
+      input[type="number"] {
+        width: 4rem;
+      }
+    }
+
+    /* Disable hover effects on mobile/touch devices */
+    @media (hover: none) {
+      button:hover:not(:disabled),
+      .btn-remove:hover,
+      .btn-green:hover:not(:disabled),
+      .btn-red:hover:not(:disabled),
+      .btn-outline:hover:not(:disabled),
+      .menu-item:hover,
+      .completed-game-item:hover,
+      .hamburger-btn:hover,
+      .menu-close:hover,
+      tbody tr:hover {
+        /* Reset all hover styles */
+        background-color: inherit;
+        color: inherit;
+        transform: none;
+        box-shadow: none;
+        border-color: inherit;
+      }
+      
+      /* Reset specific hover states that need explicit values */
+      button:hover:not(:disabled) {
+        background-color: var(--primary);
+      }
+      .btn-green:hover:not(:disabled) {
+        background-color: var(--success);
+      }
+      .btn-red:hover:not(:disabled) {
+        background-color: var(--danger);
+      }
+      .btn-outline:hover:not(:disabled) {
+        background-color: transparent;
+        color: var(--primary);
+      }
+      .btn-remove:hover {
+        background: none;
+        color: var(--danger);
+      }
+      .completed-game-item:hover {
+        transform: none;
+        background-color: var(--light-alt);
+      }
+      [data-theme="dark"] .completed-game-item:hover {
+        background-color: var(--light);
+      }
+      [data-theme="dark"] .menu-item:hover {
+        background-color: transparent;
+      }
+    }
+
+    /* Version indicator */
+    .version-badge {
+      position: fixed;
+      top: 1.25rem;
+      right: 1rem;
+      z-index: 900;
+      background-color: var(--light);
+      color: var(--primary);
+      border: 1px solid var(--gray-light);
+      border-radius: var(--radius);
+      padding: 0.25rem 0.5rem; /* Reduced padding from 0.4rem 0.75rem */
+      font-size: 0.75rem; /* Reduced font size from 0.8rem */
+      font-weight: 500;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .version-badge:hover {
+      background-color: var(--light-alt);
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+
+    /* Version modal */
+    .version-modal {
+      position: fixed;
+      top: 3.5rem;
+      right: 1rem;
+      z-index: 950;
+      background-color: var(--light);
+      border: 1px solid var(--gray-light);
+      border-radius: var(--radius);
+      padding: 1rem;
+      width: 300px;
+      max-width: calc(100vw - 2rem);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+    }
+
+    .version-modal.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0s;
+    }
+
+    .version-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .version-title h3 {
+      margin: 0;
+      color: var(--dark);
+    }
+
+    .version-modal .close-btn {
+      background: none;
+      color: var(--gray);
+      padding: 0.25rem;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .version-modal .close-btn:hover {
+      color: var(--dark);
+      background-color: var(--gray-light);
+    }
+
+    .version-info {
+      font-size: 0.9rem;
+      color: var(--gray-dark);
+    }
+
+    .version-info p {
+      margin: 0.5rem 0;
+    }
+    
+    .version-info ul {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+    }
+    
+    .version-info li {
+      margin: 0.25rem 0;
+    }
+
+    [data-theme="dark"] .version-badge {
+      background-color: var(--light-alt);
+      border-color: var(--gray-dark);
+    }
+
+    [data-theme="dark"] .version-badge:hover {
+      background-color: var(--light);
+    }
+
+    [data-theme="dark"] .version-modal {
+      background-color: var(--light-alt);
+      border-color: var(--gray-dark);
+    }
+
+    [data-theme="dark"] .version-modal .close-btn:hover {
+      background-color: var(--gray-dark);
+      color: var(--light);
+    }
+
+    [data-theme="dark"] .version-info {
+      color: var(--dark-alt);
+    }
+
+    /* Eliminated player style */
+    .eliminated-player {
+      text-decoration: line-through;
+      opacity: 0.7;
+      color: var(--gray);
+    }
+
+    [data-theme="dark"] .eliminated-player {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <div class="fixed-header"></div>
+  <div class="hamburger-menu">
+    <button class="hamburger-btn" aria-label="Open menu"><i class="fas fa-bars"></i></button>
+    <div class="menu-content">
+      <div class="menu-header">
+          <button class="menu-close" aria-label="Close menu"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="menu-item-header">
+        <i class="fas fa-cog"></i> Settings
+      </div>
+      <div class="menu-item">
+        <span><i class="fas fa-moon"></i> Dark Mode</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="dark-mode-toggle" aria-label="Toggle dark mode">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="menu-item-header">
+        <i class="fas fa-history"></i> Game History
+      </div>
+      <div class="completed-games-list" id="completed-games-list">
+        {/* Completed games will be inserted here */}
+        <div class="no-games"><i class="fas fa-info-circle"></i> Loading history...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>14-High!</h1>
+
+    <div id="app">
+      {/* Content will be dynamically inserted here */}
+      {/* Placeholder while JS loads */}
+      <div class="card">
+          <h2>Loading Game...</h2>
+          <p style="text-align: center; color: var(--gray); padding: 2rem 0;">
+              <i class="fas fa-spinner fa-spin fa-2x"></i>
+          </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Elimination notification banner (initially hidden) -->
+  <div id="elimination-banner" class="elimination-banner" style="display: none;">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span id="elimination-message">Upcoming elimination</span>
+  </div>
+
+  <!-- Version indicator -->
+  <div class="version-badge" id="version-badge">
+    <span>Version 1.0</span>
+  </div>
+  
+  <div class="version-modal" id="version-modal">
+    <div class="version-title">
+      <h3>14-High! v1.0</h3>
+      <button class="close-btn" id="version-close" aria-label="Close version info">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="version-info">
+      <p><strong>Released:</strong> March 2025</p>
+      <p><strong>Features:</strong></p>
+      <ul>
+        <li>Auto-saves game</li>
+        <li>Dark/light mode</li>
+        <li>Game history tracking</li>
+        <li>Mobile-friendly design</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    const state = {
+      players: [],
+      gameStarted: false,
+      currentRound: 1,
+      bids: {},
+      tricks: {},
+      scores: {},
+      bidPhase: true,
+      completedGames: JSON.parse(localStorage.getItem('completedGames')) || [],
+      roundHistory: [],
+      eliminatedPlayers: [] // Track eliminated players
+    };
+
+    // DOM Elements
+    const app = document.getElementById('app');
+    const hamburgerBtn = document.querySelector('.hamburger-btn');
+    const menuContent = document.querySelector('.menu-content');
+    const menuClose = document.querySelector('.menu-close');
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    const completedGamesList = document.getElementById('completed-games-list');
+    const body = document.body;
+    const versionBadge = document.getElementById('version-badge');
+    const versionModal = document.getElementById('version-modal');
+    const versionClose = document.getElementById('version-close');
+    const eliminationBanner = document.getElementById('elimination-banner');
+
+    // Track previous HTML to avoid unnecessary re-renders
+    let previousHtml = '';
+
+    // --- Initialization ---
+
+    // Load theme preference
+    function applyTheme(theme) {
+      body.setAttribute('data-theme', theme);
+      darkModeToggle.checked = theme === 'dark';
+      localStorage.setItem('theme', theme);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(savedTheme || (prefersDark ? 'dark' : 'light'));
+
+    // Load saved game state if exists
+    function loadGameState() {
+      const savedState = localStorage.getItem('gameState');
+      if (savedState) {
+        try {
+          const parsedState = JSON.parse(savedState);
+          // Update our state with saved values
+          Object.keys(parsedState).forEach(key => {
+            if (key !== 'completedGames') { // We've already loaded completedGames
+              state[key] = parsedState[key];
+            }
+          });
+          console.log('Game state loaded from local storage');
+        } catch (err) {
+          console.error('Error loading game state:', err);
+          // Clear potentially corrupted data
+          localStorage.removeItem('gameState');
+        }
+      }
+    }
+
+    // Save current game state to local storage
+    function saveGameState() {
+      try {
+        localStorage.setItem('gameState', JSON.stringify(state));
+      } catch (err) {
+        console.error('Error saving game state:', err);
+      }
+    }
+
+    // Load game on initialization
+    loadGameState();
+
+    // Check for potential eliminations
+    checkUpcomingElimination();
+
+    // Initial render
+    renderApp();
+    renderCompletedGames();
+
+
+    // --- Event Listeners ---
+
+    // Hamburger menu toggle
+    hamburgerBtn.addEventListener('click', (e) => {
+      menuContent.classList.add('active');
+      // Focus the close button when menu opens for accessibility
+      menuClose.focus();
+      e.stopPropagation();
+    });
+
+    menuClose.addEventListener('click', () => {
+      menuContent.classList.remove('active');
+      // Return focus to the menu button when closing
+      hamburgerBtn.focus();
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (menuContent.classList.contains('active') &&
+          !menuContent.contains(e.target) &&
+          e.target !== hamburgerBtn &&
+          !hamburgerBtn.contains(e.target)) { // Check if click was inside button
+        menuContent.classList.remove('active');
+      }
+    });
+
+    // Trap focus within the menu when open
+    menuContent.addEventListener('keydown', (e) => {
+        if (menuContent.classList.contains('active') && e.key === 'Tab') {
+            const focusableElements = menuContent.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+
+            if (e.shiftKey) { // Shift + Tab
+                if (document.activeElement === firstElement) {
+                    lastElement.focus();
+                    e.preventDefault();
+                }
+            } else { // Tab
+                if (document.activeElement === lastElement) {
+                    firstElement.focus();
+                    e.preventDefault();
+                }
+            }
+        }
+    });
+
+    // Close menu with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (menuContent.classList.contains('active')) {
+                menuContent.classList.remove('active');
+                hamburgerBtn.focus();
+            }
+            if (versionModal.classList.contains('active')) {
+                versionModal.classList.remove('active');
+                versionBadge.focus();
+            }
+        }
+    });
+
+    // Dark mode toggle
+    darkModeToggle.addEventListener('change', () => {
+      applyTheme(darkModeToggle.checked ? 'dark' : 'light');
+    });
+
+    // Version badge toggle
+    versionBadge.addEventListener('click', (e) => {
+      versionModal.classList.add('active');
+      e.stopPropagation(); // Prevent document click from immediately closing it
+    });
+
+    versionClose.addEventListener('click', () => {
+      versionModal.classList.remove('active');
+    });
+
+    // Close version modal when clicking outside
+    document.addEventListener('click', (e) => {
+      if (versionModal.classList.contains('active') && 
+          !versionModal.contains(e.target) && 
+          e.target !== versionBadge) {
+        versionModal.classList.remove('active');
+      }
+    });
+
+    // Setup event listeners for dynamic elements (using event delegation on #app)
+    app.addEventListener('click', (e) => {
+        // Player Setup
+        if (e.target.closest('#add-player-btn')) addPlayer();
+        if (e.target.closest('#start-game-btn')) startGame();
+        const removeBtn = e.target.closest('.btn-remove');
+        if (removeBtn) {
+            const player = removeBtn.getAttribute('data-player');
+            if (player) removePlayer(player);
+        }
+
+        // Gameplay
+        if (e.target.closest('#submit-bids-btn')) submitBids();
+        if (e.target.closest('#submit-results-btn')) submitRoundResults();
+        if (e.target.closest('#reset-game-btn')) resetGame();
+        if (e.target.closest('#undo-round-btn')) undoRound();
+    });
+
+    app.addEventListener('keypress', (e) => {
+        // Player Setup: Add player on Enter
+        if (e.target.id === 'player-name' && e.key === 'Enter') {
+            e.preventDefault(); // Prevent form submission if wrapped in form
+            addPlayer();
+        }
+        // Gameplay: Handle Enter on inputs
+        if (e.key === 'Enter') {
+            const bidInput = e.target.closest('.bid-input');
+            const trickInput = e.target.closest('.trick-input');
+
+            if (bidInput) {
+                e.preventDefault();
+                const player = bidInput.getAttribute('data-player');
+                const value = parseInt(bidInput.value) || 0;
+                if (player && value >= 0 && value <= state.currentRound) {
+                    handleBidChange(player, value, false); // Don't re-render immediately
+                    const nextInput = bidInput.closest('tr')?.nextElementSibling?.querySelector('.bid-input');
+                    if (nextInput) {
+                        nextInput.focus();
+                        nextInput.select();
+                    } else if (allBidsEntered()) {
+                        submitBids(); // Submit if last input and valid
+                    }
+                }
+                renderApp(); // Render after potential focus change or submit
+            } else if (trickInput) {
+                e.preventDefault();
+                const player = trickInput.getAttribute('data-player');
+                const value = parseInt(trickInput.value) || 0;
+                 if (player && value >= 0 && value <= 14) {
+                    handleTricksChange(player, value, false); // Don't re-render immediately
+                    const nextInput = trickInput.closest('tr')?.nextElementSibling?.querySelector('.trick-input');
+                     if (nextInput) {
+                        nextInput.focus();
+                        nextInput.select();
+                    } else if (allTricksEntered() && validateTricksTotal()) {
+                        submitRoundResults(); // Submit if last input and valid
+                    }
+                }
+                renderApp(); // Render after potential focus change or submit
+            }
+        }
+    });
+
+    app.addEventListener('input', (e) => {
+        // Gameplay: Handle live input changes for validation
+        const bidInput = e.target.closest('.bid-input');
+        const trickInput = e.target.closest('.trick-input');
+
+        if (bidInput) {
+            const player = bidInput.getAttribute('data-player');
+            const value = parseInt(bidInput.value) || 0; // Treat empty/invalid as 0 for live validation
+            if (player) {
+                handleBidChange(player, value, false); // Pass false to prevent immediate full re-render
+                // Only update validation/button state part of the UI if needed
+                updateValidationAndButtons();
+            }
+        } else if (trickInput) {
+            const player = trickInput.getAttribute('data-player');
+            const value = parseInt(trickInput.value) || 0;
+             if (player) {
+                handleTricksChange(player, value, false);
+                updateValidationAndButtons();
+            }
+        }
+    });
+
+    // Select input content on focus for easier editing
+    app.addEventListener('focusin', (e) => {
+        if (e.target.matches('input[type="number"]') || e.target.matches('input[type="text"]')) {
+            e.target.select();
+        }
+    });
+
+
+    // --- Core Rendering Logic ---
+
+    function renderApp() {
+      let newHtml = '';
+
+      if (!state.gameStarted) {
+        newHtml = renderPlayerSetup();
+      } else {
+        newHtml = renderGameplay();
+      }
+
+      // Simple diffing to reduce full re-renders
+      if (newHtml !== previousHtml) {
+        app.innerHTML = newHtml;
+        previousHtml = newHtml;
+
+        // Set focus after render if needed (e.g., back to player input)
+         if (!state.gameStarted) {
+            const playerNameInput = document.getElementById('player-name');
+            if (playerNameInput) playerNameInput.focus();
+        } else if (state.bidPhase && state.currentRound <= 14) {
+            const firstInput = document.querySelector('.bid-input');
+            if (firstInput && !firstInput.value) firstInput.focus(); // Focus first empty bid input
+        } else if (!state.bidPhase && state.currentRound <= 14) {
+             const firstInput = document.querySelector('.trick-input');
+            if (firstInput && !firstInput.value) firstInput.focus(); // Focus first empty trick input
+        }
+        
+        // Update elimination banner after DOM is updated
+        if (state.gameStarted && state.currentRound <= 14) {
+          setTimeout(checkUpcomingElimination, 0);
+        }
+      }
+    }
+
+    // Function to update only validation messages and button states without full re-render
+    function updateValidationAndButtons() {
+        if (state.gameStarted && state.currentRound <= 14) {
+             const totalBids = Object.values(state.bids).reduce((sum, bid) => sum + (bid || 0), 0);
+             const totalTricks = !state.bidPhase ? Object.values(state.tricks).reduce((sum, trick) => sum + (trick || 0), 0) : 0;
+
+             // Update Bid Info/Warning
+             const bidInfoEl = document.getElementById('bid-info');
+             if (bidInfoEl) {
+                 if (totalBids === state.currentRound) {
+                     bidInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Total bids cannot equal ${state.currentRound} (current: ${totalBids})`;
+                     bidInfoEl.classList.add('bid-warning');
+                 } else {
+                     bidInfoEl.innerHTML = `<i class="fas fa-info-circle"></i> Total bids: ${totalBids} (must not equal ${state.currentRound})`;
+                     bidInfoEl.classList.remove('bid-warning');
+                 }
+             }
+
+             // Update Trick Info/Warning
+             const trickInfoEl = document.getElementById('trick-info');
+             if (trickInfoEl) {
+                 if (totalTricks !== state.currentRound) {
+                     trickInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Total hands must equal ${state.currentRound} (current: ${totalTricks})`;
+                     trickInfoEl.classList.add('bid-warning');
+                 } else {
+                     trickInfoEl.innerHTML = `<i class="fas fa-check-circle"></i> Total hands: ${totalTricks} (equals ${state.currentRound})`;
+                     trickInfoEl.classList.remove('bid-warning');
+                 }
+             }
+
+            // Update Button States
+            const submitBidsBtn = document.getElementById('submit-bids-btn');
+            if (submitBidsBtn) {
+                submitBidsBtn.disabled = !allBidsEntered();
+            }
+            const submitResultsBtn = document.getElementById('submit-results-btn');
+            if (submitResultsBtn) {
+                submitResultsBtn.disabled = !(allTricksEntered() && validateTricksTotal());
+            }
+        }
+    }
+
+
+    // --- Rendering Components ---
+
+    function renderPlayerSetup() {
+      return `
+        <div class="card">
+          <h2><i class="fas fa-users-cog"></i> Player Setup</h2>
+
+          <div class="input-group">
+            <div class="input-with-button">
+              <input type="text" id="player-name" placeholder="Enter player name (e.g., Alice)" aria-label="Player name">
+              <button class="btn-add" id="add-player-btn"><i class="fas fa-plus"></i> Add</button>
+            </div>
+          </div>
+
+          ${state.players.length > 0 ? `
+            <div>
+              <h3><i class="fas fa-list-ul"></i> Current Players (${state.players.length})</h3>
+              <div class="player-list">
+                ${state.players.map(player => `
+                  <div class="player-item">
+                    <span>${escapeHtml(player)}</span>
+                    <button class="btn-remove" data-player="${escapeHtml(player)}" aria-label="Remove ${escapeHtml(player)}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : '<p style="text-align: center; color: var(--gray); font-size: 0.9rem; margin: 1.5rem 0;">No players added yet.</p>'}
+
+          <button
+            id="start-game-btn"
+            class="btn-full btn-green"
+            ${state.players.length < 2 ? 'disabled' : ''}
+          >
+            <i class="fas fa-play"></i>
+            ${state.players.length < 2
+              ? 'Need at least 2 players'
+              : `Start Game (${state.players.length} Players)`}
+          </button>
+        </div>
+      `;
+    }
+
+    function renderGameplay() {
+      let gameplayHtml = '';
+
+      // --- Round Input / Game Over ---
+      if (state.currentRound <= 14) {
+        const totalBids = Object.values(state.bids).reduce((sum, bid) => sum + (bid || 0), 0);
+        const totalTricks = !state.bidPhase ? Object.values(state.tricks).reduce((sum, trick) => sum + (trick || 0), 0) : 0;
+
+        const bidInfoHtml = state.bidPhase ?
+          `<div id="bid-info" class="game-info ${totalBids === state.currentRound ? 'bid-warning' : ''}">
+            ${totalBids === state.currentRound ?
+              `<i class="fas fa-exclamation-triangle"></i> Total bids cannot equal ${state.currentRound} (current: ${totalBids})` :
+              `<i class="fas fa-info-circle"></i> Total bids: ${totalBids} (must not equal ${state.currentRound})`}
+          </div>` : '';
+
+        const tricksInfoHtml = !state.bidPhase ?
+          `<div id="trick-info" class="game-info ${totalTricks !== state.currentRound ? 'bid-warning' : ''}">
+            ${totalTricks !== state.currentRound ?
+              `<i class="fas fa-exclamation-triangle"></i> Total hands must equal ${state.currentRound} (current: ${totalTricks})` :
+              `<i class="fas fa-check-circle"></i> Total hands: ${totalTricks} (equals ${state.currentRound})`}
+          </div>` : '';
+
+        gameplayHtml += `
+          <div class="card">
+            <div class="flex-between" style="margin-bottom: 0.25rem;">
+              <h2><i class="fas fa-tasks"></i> Round ${state.currentRound} / 14</h2>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span class="game-status">${state.bidPhase ? 'Bidding Phase' : 'Enter Hands Won'}</span>
+                <div id="round-elimination-banner" style="display: none;" class="elimination-banner">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  <span id="round-elimination-message">Upcoming elimination</span>
+                </div>
+              </div>
+            </div>
+
+            ${state.bidPhase ? bidInfoHtml : tricksInfoHtml}
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Bid</th>
+                    ${!state.bidPhase ? '<th>Hands Won</th>' : ''}
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${state.players.map(player => `
+                    <tr>
+                      <td>${escapeHtml(player)}</td>
+                      <td>
+                        ${state.bidPhase
+                          ? `<input type="number" min="0" max="${state.currentRound}" value="${state.bids[player] !== undefined ? state.bids[player] : ''}"
+                               class="bid-input" data-player="${escapeHtml(player)}" aria-label="${escapeHtml(player)} bid" inputmode="numeric" pattern="[0-9]*">`
+                          : `<span class="badge badge-blue">${state.bids[player] ?? '?'}</span>`}
+                      </td>
+                      ${!state.bidPhase
+                        ? `<td class="trick-value">
+                            <input type="number" min="0" max="14" value="${state.tricks[player] !== undefined ? state.tricks[player] : ''}"
+                             class="trick-input" data-player="${escapeHtml(player)}" aria-label="${escapeHtml(player)} hands won" inputmode="numeric" pattern="[0-9]*">
+                          </td>`
+                        : ''}
+                      <td><span class="score-value">${state.scores[player] || 0}</span></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            ${state.bidPhase
+              ? `<button
+                  id="submit-bids-btn"
+                  class="btn-full"
+                  ${!allBidsEntered() ? 'disabled' : ''}
+                >
+                  <i class="fas fa-check-circle"></i> Confirm Bids
+                </button>`
+              : `<button
+                  id="submit-results-btn"
+                  class="btn-full btn-green"
+                  ${!(allTricksEntered() && validateTricksTotal()) ? 'disabled' : ''}
+                >
+                  <i class="fas fa-flag-checkered"></i> Submit Round ${state.currentRound} Results
+                </button>`
+            }
+          </div>
+        `;
+      } else {
+        const winners = getWinners();
+        gameplayHtml += `
+          <div class="card">
+            <h2><i class="fas fa-trophy"></i> Game Over!</h2>
+
+            ${winners.length > 0
+              ? `<div class="winner-display">
+                  <h3>${winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h3>
+                  <div class="winner-name">
+                    <i class="fas fa-crown"></i> ${winners.map(escapeHtml).join(' & ')}
+                  </div>
+                  <p>${state.scores[winners[0]] || 0} points</p>
+                </div>`
+              : '<p>Error determining winner.</p>'}
+          </div>
+        `;
+      }
+
+      // --- Scoreboard & Actions ---
+      gameplayHtml += `
+        <div class="card">
+          <h2><i class="fas fa-clipboard-list"></i> Scoreboard</h2>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Player</th>
+                  <th>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${getSortedPlayers().map((player, index) => {
+                    const rank = index + 1;
+                    // Use the current state.eliminatedPlayers array to determine if player is eliminated
+                    const isEliminated = state.eliminatedPlayers.includes(player);
+                    let medal = '';
+                    if (rank === 1) medal = '<i class="fas fa-medal" style="color: #d4af37;"></i>'; // Gold
+                    else if (rank === 2) medal = '<i class="fas fa-medal" style="color: #c0c0c0;"></i>'; // Silver
+                    else if (rank === 3) medal = '<i class="fas fa-medal" style="color: #cd7f32;"></i>'; // Bronze
+
+                    return `
+                  <tr class="${state.currentRound > 14 && getWinners().includes(player) ? 'winner-row' : ''}">
+                    <td>${rank} ${medal}</td>
+                    <td class="${isEliminated ? 'eliminated-player' : ''}">${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash"></i>' : ''}</td>
+                    <td class="${isEliminated ? 'eliminated-player' : ''}">${state.scores[player] || 0}</td>
+                  </tr>
+                `}).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="flex-between">
+          <div class="button-group">
+            <button id="reset-game-btn" class="btn-red"><i class="fas fa-power-off"></i> New Game</button>
+            ${state.roundHistory.length > 0 && state.currentRound <= 14
+              ? `<button id="undo-round-btn" class="btn-outline"><i class="fas fa-undo-alt"></i> Undo Round</button>`
+              : ''}
+          </div>
+          ${state.currentRound <= 14 ? `<p>Round ${state.currentRound} / 14</p>` : '<p>Final Scores</p>'}
+        </div>
+      `;
+
+      return gameplayHtml;
+    }
+
+    function renderCompletedGames() {
+      if (!completedGamesList) return;
+      completedGamesList.innerHTML = state.completedGames.length > 0
+        ? state.completedGames.slice().reverse().map((game, index) => ` // Show newest first
+          <div class="completed-game-item">
+            <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
+            <div class="game-winner"><i class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
+            <div class="game-score"><i class="fas fa-star"></i> ${game.score} points</div>
+            <div style="font-size: 0.8rem;"><i class="fas fa-users"></i> ${game.players.map(escapeHtml).join(', ')}</div>
+          </div>
+        `).join('')
+        : '<div class="no-games"><i class="fas fa-folder-open"></i> No completed games yet</div>';
+    }
+
+    // --- Player Management ---
+    function addPlayer() {
+      const playerNameInput = document.getElementById('player-name');
+      if (!playerNameInput) return;
+
+      let playerName = playerNameInput.value.trim();
+      
+      // Capitalize the first letter of the name
+      if (playerName.length > 0) {
+        playerName = playerName.charAt(0).toUpperCase() + playerName.slice(1);
+      }
+
+      if (playerName && !state.players.includes(playerName)) {
+        if (state.players.length >= 56) { // Changed from 10 to 56
+            alert("Maximum of 56 players allowed.");
+            return;
+        }
+        state.players.push(playerName);
+        state.scores[playerName] = 0;
+        playerNameInput.value = '';
+        saveGameState(); // Save after adding player
+        // Check eliminations after adding a player
+        if (state.gameStarted) {
+          checkUpcomingElimination();
+        }
+        renderApp(); // Full re-render needed
+      } else if (state.players.includes(playerName)) {
+          alert(`Player "${escapeHtml(playerName)}" already exists!`);
+          playerNameInput.select();
+      } else {
+          playerNameInput.focus(); // Focus if empty input
+      }
+    }
+
+    function removePlayer(playerToRemove) {
+      state.players = state.players.filter(player => player !== playerToRemove);
+      delete state.bids[playerToRemove];
+      delete state.tricks[playerToRemove];
+      delete state.scores[playerToRemove];
+      saveGameState(); // Save after removing player
+      // Check eliminations after removing a player
+      if (state.gameStarted) {
+        checkUpcomingElimination();
+      }
+      renderApp(); // Full re-render
+    }
+
+    // --- Game Logic ---
+    function startGame() {
+      if (state.players.length >= 2) {
+        state.gameStarted = true;
+        state.currentRound = 1;
+        state.bidPhase = true;
+        state.players.forEach(player => {
+          state.scores[player] = 0;
+        });
+        state.bids = {};
+        state.tricks = {};
+        state.roundHistory = []; // Clear history for new game
+        state.eliminatedPlayers = []; // Reset eliminated players list
+        saveGameState(); // Save game start state
+        
+        // Check for eliminations at game start based on initial player count
+        checkElimination();
+        
+        // Check for upcoming eliminations when game starts
+        checkUpcomingElimination();
+        renderApp(); // Full re-render
+      }
+    }
+
+    function handleBidChange(player, value, shouldRender = true) {
+      const maxBid = state.currentRound;
+      // Allow empty input during typing, default to 0 only if needed
+      const bidValue = value === '' ? undefined : Math.min(Math.max(0, parseInt(value) || 0), maxBid);
+      state.bids[player] = bidValue;
+      saveGameState(); // Save after bid change
+      if (shouldRender) {
+          renderApp();
+      }
+    }
+
+    function handleTricksChange(player, value, shouldRender = true) {
+        // Allow empty input during typing
+      const tricksValue = value === '' ? undefined : Math.min(Math.max(0, parseInt(value) || 0), 14);
+      state.tricks[player] = tricksValue;
+      saveGameState(); // Save after tricks change
+       if (shouldRender) {
+           renderApp();
+       }
+    }
+
+    function submitBids() {
+      if (allBidsEntered()) {
+        state.bidPhase = false;
+        saveGameState(); // Save after submitting bids
+        renderApp(); // Full re-render
+      } else {
+          alert("Please ensure all players have entered a valid bid, and the total bids do not equal the current round number.");
+      }
+    }
+
+    function checkElimination() {
+      const threshold = 56;
+      const product = state.players.length * state.currentRound;
+      
+      if (product > threshold) {
+        const eliminated = eliminateLowestScoringPlayer();
+        return eliminated !== null; // Return true if a player was eliminated
+      }
+      return false; // Return false if no elimination occurred
+    }
+
+    function eliminateLowestScoringPlayer() {
+      if (state.players.length > 1) { // Ensure at least one player remains
+        // Find the player(s) with the lowest score
+        const scores = state.players.map(player => state.scores[player] || 0);
+        const lowestScore = Math.min(...scores);
+        
+        // Get all players with the lowest score (in case of ties)
+        const lowestPlayers = state.players.filter(player => (state.scores[player] || 0) === lowestScore);
+        
+        // If there's a tie for lowest score, eliminate just one player (the first in the list)
+        const playerToEliminate = lowestPlayers[0];
+        
+        if (playerToEliminate) {
+          // Remove from active players list
+          state.players = state.players.filter(player => player !== playerToEliminate);
+          
+          // Add to eliminated players list
+          state.eliminatedPlayers.push(playerToEliminate);
+          
+          // Create and show a custom elimination notification
+          const notificationMsg = `Player "${escapeHtml(playerToEliminate)}" has been eliminated due to having the lowest score (${lowestScore} points)!`;
+          
+          // Display alert message
+          alert(notificationMsg);
+          
+          // Return the eliminated player name for reference
+          return playerToEliminate;
+        }
+      }
+      return null; // Return null if no player was eliminated
+    }
+
+    // Function to check and display upcoming eliminations
+    function checkUpcomingElimination() {
+      if (!state.gameStarted || state.currentRound > 14 || state.players.length < 2) {
+        hideEliminationBanner();
+        return;
+      }
+      
+      const threshold = 56;
+      // Check future rounds for potential eliminations
+      for (let futureRound = state.currentRound; futureRound <= 14; futureRound++) {
+        const product = state.players.length * futureRound;
+        if (product > threshold) {
+          // We found the next elimination round
+          showEliminationBanner(futureRound);
+          return;
+        }
+      }
+      
+      // No eliminations upcoming
+      hideEliminationBanner();
+    }
+    
+    function showEliminationBanner(round) {
+      // Update both banner locations
+      const message = document.getElementById('elimination-message');
+      const roundMessage = document.getElementById('round-elimination-message');
+      const roundBanner = document.getElementById('round-elimination-banner');
+      
+      const bannerText = `Upcoming elimination at: Round ${round}`;
+      
+      if (message) message.textContent = bannerText;
+      if (roundMessage && roundBanner) {
+        roundMessage.textContent = bannerText;
+        roundBanner.style.display = 'flex';
+        console.log("Setting round elimination banner to display:flex"); // Add debug
+      } else {
+        console.log("Round banner elements not found:", roundMessage, roundBanner); // Debug
+      }
+      
+      // Keep the original banner hidden
+      const origBanner = document.getElementById('elimination-banner');
+      if (origBanner) origBanner.style.display = 'none';
+    }
+    
+    function hideEliminationBanner() {
+      const origBanner = document.getElementById('elimination-banner');
+      if (origBanner) origBanner.style.display = 'none';
+      
+      const roundBanner = document.getElementById('round-elimination-banner');
+      if (roundBanner) {
+        roundBanner.style.display = 'none';
+        console.log("Hiding round elimination banner"); // Debug
+      }
+    }
+
+    function submitRoundResults() {
+      if (allTricksEntered() && validateTricksTotal()) {
+        // Save current state before making changes
+        state.roundHistory.push(JSON.parse(JSON.stringify({ // Deep copy state
+          currentRound: state.currentRound,
+          bids: state.bids,
+          tricks: state.tricks,
+          scores: state.scores,
+          bidPhase: state.bidPhase,
+          eliminatedPlayers: [...state.eliminatedPlayers] // Save list of eliminated players
+        })));
+
+        // Calculate scores
+        state.players.forEach(player => {
+          const playerBid = state.bids[player];
+          const playerTricks = state.tricks[player];
+          let roundScore = 0;
+
+          if (playerBid === playerTricks) {
+            roundScore = playerBid === 0 ? 10 : playerTricks + (10 * playerBid);
+          } else {
+            roundScore = playerTricks;
+          }
+
+          state.scores[player] = (state.scores[player] || 0) + roundScore;
+        });
+
+        // Advance round or end game
+        if (state.currentRound < 14) {
+          state.currentRound++;
+          state.bidPhase = true;
+          state.bids = {}; // Reset bids for next round
+          state.tricks = {}; // Reset tricks
+          
+          // Check for elimination at the start of the new round
+          const playerEliminated = checkElimination();
+          
+          // If a player was eliminated, save the state again to reflect this change
+          if (playerEliminated) {
+            saveGameState(); 
+          }
+          
+          // Check for upcoming eliminations again
+          checkUpcomingElimination();
+        } else {
+          state.currentRound = 15; // Mark game as ended
+          saveCompletedGame();
+          // Hide elimination banner when game ends
+          hideEliminationBanner();
+        }
+
+        saveGameState(); // Save after submitting round results
+        renderApp(); // Full re-render
+      } else {
+          if (!allTricksEntered()) {
+              alert("Please enter the number of hands won for all players.");
+          } else {
+              alert("The total number of hands won must equal the current round number (" + state.currentRound + ").");
+          }
+      }
+    }
+
+    function saveCompletedGame() {
+        const winners = getWinners();
+        const completedGame = {
+            date: new Date().toISOString(),
+            winners: winners,
+            score: winners.length > 0 ? state.scores[winners[0]] : 0,
+            players: [...state.players],
+            finalScores: {...state.scores} // Optional: store all final scores
+        };
+        state.completedGames.push(completedGame);
+        localStorage.setItem('completedGames', JSON.stringify(state.completedGames));
+        // Clear the current game state since the game is complete
+        localStorage.removeItem('gameState');
+        renderCompletedGames(); // Update history list
+    }
+
+    function resetGame() {
+        if (confirm("Are you sure you want to start a new game? This will clear all current players and scores.")) {
+            state.players = [];
+            state.gameStarted = false;
+            state.currentRound = 1;
+            state.bidPhase = true;
+            state.bids = {};
+            state.tricks = {};
+            state.scores = {};
+            state.roundHistory = [];
+            state.eliminatedPlayers = []; // Reset eliminated players
+            // We have two options:
+            // 1. Clear the game state entirely:
+            localStorage.removeItem('gameState');
+            // 2. Or save the empty state:
+            // saveGameState();
+            // Hide elimination banner when resetting
+            hideEliminationBanner();
+            previousHtml = ''; // Force re-render from scratch
+            renderApp();
+        }
+    }
+
+    function undoRound() {
+      if (state.roundHistory.length > 0) {
+          if (confirm("Are you sure you want to undo the last round?")) {
+              const previousState = state.roundHistory.pop();
+              
+              // Check if we need to restore eliminated players
+              if (previousState.eliminatedPlayers && Array.isArray(previousState.eliminatedPlayers)) {
+                  // Use the previous eliminated list directly
+                  state.eliminatedPlayers = [...previousState.eliminatedPlayers];
+                  
+                  // Check for any players that were eliminated but should be restored
+                  const currentPlayers = new Set(state.players);
+                  const previousPlayers = new Set([...Object.keys(previousState.scores)]);
+                  
+                  // Find players that exist in previous scores but not in current players
+                  for (const player of previousPlayers) {
+                      if (!currentPlayers.has(player) && !state.eliminatedPlayers.includes(player)) {
+                          // This player was eliminated after the previous round, restore them
+                          state.players.push(player);
+                          
+                          // Also remove them from the eliminated players list if they're in it
+                          state.eliminatedPlayers = state.eliminatedPlayers.filter(p => p !== player);
+                      }
+                  }
+              }
+              
+              // Restore state directly from the deep copied history item
+              state.currentRound = previousState.currentRound;
+              state.bids = previousState.bids;
+              state.tricks = previousState.tricks;
+              state.scores = previousState.scores;
+              // Always go back to the bidding phase of the restored round for correction
+              state.bidPhase = true;
+              // Clear tricks data as we are back to bidding
+              state.tricks = {};
+              saveGameState(); // Save after undoing round
+              // Check eliminations after undoing a round
+              checkUpcomingElimination();
+              renderApp(); // Full re-render
+          }
+      }
+    }
+
+    // --- Helper & Validation Functions ---
+
+    // Basic HTML escaping
+    function escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#39;");
+    }
+
+    function allBidsEntered() {
+      if (!state.players.every(player => state.bids[player] !== undefined && state.bids[player] !== '')) {
+        return false;
+      }
+      const totalBids = Object.values(state.bids).reduce((sum, bid) => sum + (parseInt(bid) || 0), 0);
+      return totalBids !== state.currentRound;
+    }
+
+    function allTricksEntered() {
+      return state.players.every(player => state.tricks[player] !== undefined && state.tricks[player] !== '');
+    }
+
+    function validateTricksTotal() {
+      const totalTricks = Object.values(state.tricks).reduce((sum, trick) => sum + (parseInt(trick) || 0), 0);
+      return totalTricks === state.currentRound;
+    }
+
+    function getWinners() {
+      if (!state.gameStarted || state.currentRound <= 14) {
+        return [];
+      }
+      // Ensure scores object is populated
+      if (Object.keys(state.scores).length === 0) return [];
+
+      const highestScore = Math.max(...Object.values(state.scores));
+      return state.players.filter(player => state.scores[player] === highestScore);
+    }
+
+    function getSortedPlayers() {
+      // Create pairs of [player, score], sort, then extract player names
+      // Include both active players and eliminated players, but avoid duplicates
+      const allPlayersSet = new Set([...state.players, ...state.eliminatedPlayers]);
+      const allPlayers = Array.from(allPlayersSet);
+      
+      return allPlayers
+        .map(player => ({ name: player, score: state.scores[player] || 0 }))
+        .sort((a, b) => b.score - a.score)
+        .map(p => p.name);
+    }
+
+  </script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registered successfully:', registration.scope);
+          })
+          .catch(error => {
+            console.error('Service Worker registration failed:', error);
+          });
+      });
+      
+      // Listen for service worker updates
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('Service Worker updated, refreshing content...');
+      });
+      
+      // Handle installation prompt (Add to Home Screen)
+      let deferredPrompt;
+      const addToHomeEl = document.createElement('div');
+      addToHomeEl.style.display = 'none';
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        
+        // Create installation notification
+        addToHomeEl.style.display = 'flex';
+        addToHomeEl.className = 'elimination-banner';
+        addToHomeEl.style.position = 'fixed';
+        addToHomeEl.style.top = '4.5rem';
+        addToHomeEl.style.left = '50%';
+        addToHomeEl.style.transform = 'translateX(-50%)';
+        addToHomeEl.style.zIndex = '850';
+        addToHomeEl.innerHTML = `
+          <i class="fas fa-download"></i>
+          <span>14-High! can be installed on your device</span>
+        `;
+        
+        // Add install button
+        const installBtn = document.createElement('button');
+        installBtn.style.marginLeft = '8px';
+        installBtn.style.padding = '2px 8px';
+        installBtn.style.border = 'none';
+        installBtn.style.background = 'white';
+        installBtn.style.color = '#4f46e5';
+        installBtn.style.borderRadius = '3px';
+        installBtn.style.fontSize = '0.75rem';
+        installBtn.style.fontWeight = 'bold';
+        installBtn.style.cursor = 'pointer';
+        installBtn.innerText = 'Install';
+        
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.style.marginLeft = '8px';
+        closeBtn.style.padding = '0px 6px';
+        closeBtn.style.border = 'none';
+        closeBtn.style.background = 'rgba(255,255,255,0.2)';
+        closeBtn.style.color = 'white';
+        closeBtn.style.borderRadius = '50%';
+        closeBtn.style.fontSize = '0.75rem';
+        closeBtn.style.fontWeight = 'bold';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.innerHTML = '&times;';
+        
+        addToHomeEl.appendChild(installBtn);
+        addToHomeEl.appendChild(closeBtn);
+        document.body.appendChild(addToHomeEl);
+        
+        installBtn.addEventListener('click', (e) => {
+          // Hide the prompt
+          addToHomeEl.style.display = 'none';
+          // Show the install prompt
+          deferredPrompt.prompt();
+          // Wait for the user to respond to the prompt
+          deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+              console.log('User accepted the A2HS prompt');
+            } else {
+              console.log('User dismissed the A2HS prompt');
+            }
+            deferredPrompt = null;
+          });
+        });
+        
+        closeBtn.addEventListener('click', () => {
+          addToHomeEl.style.display = 'none';
+        });
+      });
+      
+      // Listen for successful installation
+      window.addEventListener('appinstalled', (evt) => {
+        console.log('Application installed successfully!');
+        // Hide the install banner if it's visible
+        if (addToHomeEl) {
+          addToHomeEl.style.display = 'none';
+        }
+        deferredPrompt = null;
+      });
+    }
+  </script>
+</body>
+</html>
