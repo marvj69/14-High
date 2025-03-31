@@ -1126,6 +1126,202 @@
     [data-theme="dark"] .eliminated-player {
       opacity: 0.6;
     }
+
+    /* Game Details Modal */
+    .game-details-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease;
+    }
+
+    .game-details-modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .game-details-content {
+      background-color: var(--light);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 1.5rem;
+      position: relative;
+      border: 1px solid var(--gray-light);
+    }
+
+    [data-theme="dark"] .game-details-content {
+      background-color: var(--light-alt);
+      border-color: var(--gray-dark);
+    }
+
+    .game-details-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--gray-light);
+    }
+
+    [data-theme="dark"] .game-details-header {
+      border-bottom-color: var(--gray-dark);
+    }
+
+    .game-details-close {
+      background: none;
+      color: var(--gray);
+      border: none;
+      cursor: pointer;
+      font-size: 1.25rem;
+      padding: 0.25rem;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .game-details-close:hover {
+      background-color: var(--gray-light);
+      color: var(--dark);
+    }
+
+    [data-theme="dark"] .game-details-close:hover {
+      background-color: var(--gray-dark);
+      color: var(--light);
+    }
+
+    .game-details-title {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .game-date {
+      font-size: 0.9rem;
+      color: var(--gray);
+      margin-bottom: 1rem;
+    }
+
+    .game-details-winners {
+      background-color: var(--light-alt);
+      padding: 0.75rem;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      border-left: 3px solid var(--success);
+    }
+
+    [data-theme="dark"] .game-details-winners {
+      background-color: var(--light);
+      border-left-color: var(--success);
+    }
+
+    .game-details-winners h4 {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--gray);
+      margin-bottom: 0.5rem;
+    }
+
+    .winner-names {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .winner-names i {
+      color: var(--warning);
+    }
+
+    .player-scores-list {
+      margin-top: 1rem;
+    }
+
+    .player-score-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--gray-light);
+    }
+
+    [data-theme="dark"] .player-score-item {
+      border-bottom-color: var(--gray-dark);
+    }
+
+    .player-score-item:last-child {
+      border-bottom: none;
+    }
+
+    .player-score-name {
+      font-weight: 500;
+    }
+
+    .player-score-value {
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .player-score-item.winner {
+      background-color: rgba(34, 197, 94, 0.05);
+    }
+
+    [data-theme="dark"] .player-score-item.winner {
+      background-color: rgba(74, 222, 128, 0.08);
+    }
+
+    .player-score-item.eliminated {
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    [data-theme="dark"] .player-score-item.eliminated {
+      opacity: 0.6;
+    }
+
+    .player-scores-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0.75rem;
+      background-color: var(--light-alt);
+      font-weight: 500;
+      color: var(--gray);
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--gray-light);
+      border-top-left-radius: var(--radius);
+      border-top-right-radius: var(--radius);
+    }
+
+    [data-theme="dark"] .player-scores-header {
+      background-color: var(--light);
+      border-bottom-color: var(--gray-dark);
+    }
+
+    .player-scores-container {
+      border: 1px solid var(--gray-light);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    [data-theme="dark"] .player-scores-container {
+      border-color: var(--gray-dark);
+    }
   </style>
 </head>
 <body data-theme="light">
@@ -1181,18 +1377,23 @@
 
   <!-- Version indicator -->
   <div class="version-badge" id="version-badge">
-    <span>Version 1.0</span>
+    <span>Version 1.1.0</span>
   </div>
   
   <div class="version-modal" id="version-modal">
     <div class="version-title">
-      <h3>14-High! v1.0</h3>
+      <h3>14-High! v1.1.0</h3>
       <button class="close-btn" id="version-close" aria-label="Close version info">
         <i class="fas fa-times"></i>
       </button>
     </div>
     <div class="version-info">
       <p><strong>Released:</strong> March 2025</p>
+      <p><strong>What's New in 1.1.0:</strong></p>
+      <ul>
+        <li>Added detailed game history with player scores</li>
+        <li>Click on past games to see all players and final scores</li>
+      </ul>
       <p><strong>Features:</strong></p>
       <ul>
         <li>Auto-saves game</li>
@@ -1200,6 +1401,21 @@
         <li>Game history tracking</li>
         <li>Mobile-friendly design</li>
       </ul>
+    </div>
+  </div>
+
+  <!-- Game Details Modal -->
+  <div class="game-details-modal" id="game-details-modal">
+    <div class="game-details-content">
+      <div class="game-details-header">
+        <h3 class="game-details-title">Game Details</h3>
+        <button class="game-details-close" id="game-details-close" aria-label="Close game details">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="game-details-body">
+        <!-- Dynamic content will be inserted here -->
+      </div>
     </div>
   </div>
 
@@ -1747,9 +1963,11 @@
 
     function renderCompletedGames() {
       if (!completedGamesList) return;
+
       completedGamesList.innerHTML = state.completedGames.length > 0
-        ? state.completedGames.slice().reverse().map((game, index) => ` // Show newest first
-          <div class="completed-game-item">
+        ? state.completedGames.slice().reverse().map((game, index) => 
+          // Show newest first
+          `<div class="completed-game-item" data-game-index="${state.completedGames.length - 1 - index}">
             <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
             <div class="game-winner"><i class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
             <div class="game-score"><i class="fas fa-star"></i> ${game.score} points</div>
@@ -1757,6 +1975,14 @@
           </div>
         `).join('')
         : '<div class="no-games"><i class="fas fa-folder-open"></i> No completed games yet</div>';
+
+      // Add click listeners to game items
+      document.querySelectorAll('.completed-game-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const gameIndex = parseInt(item.getAttribute('data-game-index'));
+          showGameDetails(gameIndex);
+        });
+      });
     }
 
     // --- Player Management ---
@@ -2028,7 +2254,8 @@
             winners: winners,
             score: winners.length > 0 ? state.scores[winners[0]] : 0,
             players: [...state.players],
-            finalScores: {...state.scores} // Optional: store all final scores
+            finalScores: {...state.scores}, // Store all final scores
+            eliminatedPlayers: [...state.eliminatedPlayers] // Store eliminated players
         };
         state.completedGames.push(completedGame);
         localStorage.setItem('completedGames', JSON.stringify(state.completedGames));
@@ -2154,6 +2381,87 @@
         .map(player => ({ name: player, score: state.scores[player] || 0 }))
         .sort((a, b) => b.score - a.score)
         .map(p => p.name);
+    }
+
+    // Game details modal functionality
+    const gameDetailsModal = document.getElementById('game-details-modal');
+    const gameDetailsClose = document.getElementById('game-details-close');
+    const gameDetailsBody = document.getElementById('game-details-body');
+
+    // Close game details modal
+    gameDetailsClose.addEventListener('click', () => {
+      gameDetailsModal.classList.remove('active');
+    });
+
+    // Close game details modal when clicking outside
+    gameDetailsModal.addEventListener('click', (e) => {
+      if (e.target === gameDetailsModal) {
+        gameDetailsModal.classList.remove('active');
+      }
+    });
+
+    // Function to show game details
+    function showGameDetails(gameIndex) {
+      const game = state.completedGames[gameIndex];
+      if (!game) return;
+
+      // Format date
+      const gameDate = new Date(game.date);
+      const formattedDate = `${gameDate.toLocaleDateString()} ${gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      
+      // Get all players and scores, including eliminated players
+      const allPlayers = [...new Set([...game.players, ...(game.eliminatedPlayers || [])])];
+      
+      // Sort players by score (highest first)
+      const sortedPlayers = allPlayers.sort((a, b) => 
+        (game.finalScores[b] || 0) - (game.finalScores[a] || 0)
+      );
+
+      // Create HTML content
+      let content = `
+        <div class="game-date"><i class="fas fa-calendar-alt"></i> ${formattedDate}</div>
+        
+        <div class="game-details-winners">
+          <h4>${game.winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h4>
+          <div class="winner-names">
+            <i class="fas fa-crown"></i> ${game.winners.map(escapeHtml).join(' & ')}
+            <span style="margin-left:auto;">${game.score} points</span>
+          </div>
+        </div>
+        
+        <h4>All Players (${allPlayers.length})</h4>
+        <div class="player-scores-container">
+          <div class="player-scores-header">
+            <span>Player</span>
+            <span>Final Score</span>
+          </div>
+          <div class="player-scores-list">
+      `;
+      
+      // Add each player
+      sortedPlayers.forEach((player, index) => {
+        const isWinner = game.winners.includes(player);
+        const isEliminated = (game.eliminatedPlayers || []).includes(player);
+        const playerScore = game.finalScores[player] || 0;
+        
+        content += `
+          <div class="player-score-item ${isWinner ? 'winner' : ''} ${isEliminated ? 'eliminated' : ''}">
+            <span class="player-score-name">${index + 1}. ${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash"></i>' : ''}</span>
+            <span class="player-score-value">${playerScore}</span>
+          </div>
+        `;
+      });
+      
+      content += `
+          </div>
+        </div>
+      `;
+      
+      // Update modal content
+      gameDetailsBody.innerHTML = content;
+      
+      // Show modal
+      gameDetailsModal.classList.add('active');
     }
 
   </script>
