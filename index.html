@@ -1377,18 +1377,24 @@
 
   <!-- Version indicator -->
   <div class="version-badge" id="version-badge">
-    <span>Version 1.1.0</span>
+    <span>Version 1.1.1</span>
   </div>
   
   <div class="version-modal" id="version-modal">
     <div class="version-title">
-      <h3>14-High! v1.1.0</h3>
+      <h3>14-High! v1.1.1</h3>
       <button class="close-btn" id="version-close" aria-label="Close version info">
         <i class="fas fa-times"></i>
       </button>
     </div>
     <div class="version-info">
       <p><strong>Released:</strong> March 2025</p>
+      <p><strong>What's New in 1.1.1:</strong></p>
+      <ul>
+        <li>Fixed issue where eliminated players weren't showing in game history</li>
+        <li>Added indicator for eliminated players in game history list</li>
+        <li>Improved keyboard navigation (Escape key support for modals)</li>
+      </ul>
       <p><strong>What's New in 1.1.0:</strong></p>
       <ul>
         <li>Added detailed game history with player scores</li>
@@ -1560,6 +1566,9 @@
             if (versionModal.classList.contains('active')) {
                 versionModal.classList.remove('active');
                 versionBadge.focus();
+            }
+            if (gameDetailsModal.classList.contains('active')) {
+                gameDetailsModal.classList.remove('active');
             }
         }
     });
@@ -1965,15 +1974,25 @@
       if (!completedGamesList) return;
 
       completedGamesList.innerHTML = state.completedGames.length > 0
-        ? state.completedGames.slice().reverse().map((game, index) => 
+        ? state.completedGames.slice().reverse().map((game, index) => {
           // Show newest first
-          `<div class="completed-game-item" data-game-index="${state.completedGames.length - 1 - index}">
+          const elimCount = game.eliminatedPlayers && game.eliminatedPlayers.length ? 
+                          `<span style="color: var(--danger)"><i class="fas fa-user-slash"></i> ${game.eliminatedPlayers.length}</span>` : '';
+          
+          // Count total players (active + eliminated)
+          const totalPlayers = (game.players ? game.players.length : 0) + 
+                            (game.eliminatedPlayers ? game.eliminatedPlayers.length : 0);
+                            
+          return `<div class="completed-game-item" data-game-index="${state.completedGames.length - 1 - index}">
             <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
             <div class="game-winner"><i class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
             <div class="game-score"><i class="fas fa-star"></i> ${game.score} points</div>
-            <div style="font-size: 0.8rem;"><i class="fas fa-users"></i> ${game.players.map(escapeHtml).join(', ')}</div>
-          </div>
-        `).join('')
+            <div style="font-size: 0.8rem;">
+              <i class="fas fa-users"></i> ${game.players.map(escapeHtml).join(', ')} 
+              ${elimCount ? `(+${elimCount})` : ''}
+            </div>
+          </div>`;
+        }).join('')
         : '<div class="no-games"><i class="fas fa-folder-open"></i> No completed games yet</div>';
 
       // Add click listeners to game items
@@ -2249,13 +2268,24 @@
 
     function saveCompletedGame() {
         const winners = getWinners();
+        
+        // Create a copy of eliminatedPlayers to avoid reference issues
+        const eliminatedPlayersList = [...state.eliminatedPlayers];
+        
+        console.log('Saving completed game with:', {
+            players: state.players.length,
+            eliminated: eliminatedPlayersList.length,
+            eliminatedPlayers: eliminatedPlayersList,
+            winners: winners
+        });
+        
         const completedGame = {
             date: new Date().toISOString(),
             winners: winners,
             score: winners.length > 0 ? state.scores[winners[0]] : 0,
             players: [...state.players],
             finalScores: {...state.scores}, // Store all final scores
-            eliminatedPlayers: [...state.eliminatedPlayers] // Store eliminated players
+            eliminatedPlayers: eliminatedPlayersList // Store eliminated players
         };
         state.completedGames.push(completedGame);
         localStorage.setItem('completedGames', JSON.stringify(state.completedGames));
@@ -2409,8 +2439,24 @@
       const gameDate = new Date(game.date);
       const formattedDate = `${gameDate.toLocaleDateString()} ${gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
       
+      // Ensure eliminatedPlayers exists (for backwards compatibility)
+      if (!game.eliminatedPlayers) {
+        game.eliminatedPlayers = [];
+        // Save the updated game data to localStorage
+        localStorage.setItem('completedGames', JSON.stringify(state.completedGames));
+        console.log('Added missing eliminatedPlayers array to saved game');
+      }
+      
+      console.log('Game data:', {
+        players: game.players,
+        eliminatedPlayers: game.eliminatedPlayers,
+        finalScores: game.finalScores
+      });
+      
       // Get all players and scores, including eliminated players
-      const allPlayers = [...new Set([...game.players, ...(game.eliminatedPlayers || [])])];
+      const allPlayers = [...new Set([...game.players, ...game.eliminatedPlayers])];
+      
+      console.log('All players (including eliminated):', allPlayers);
       
       // Sort players by score (highest first)
       const sortedPlayers = allPlayers.sort((a, b) => 
@@ -2441,8 +2487,10 @@
       // Add each player
       sortedPlayers.forEach((player, index) => {
         const isWinner = game.winners.includes(player);
-        const isEliminated = (game.eliminatedPlayers || []).includes(player);
+        const isEliminated = game.eliminatedPlayers.includes(player);
         const playerScore = game.finalScores[player] || 0;
+        
+        console.log(`Player ${player}: winner=${isWinner}, eliminated=${isEliminated}, score=${playerScore}`);
         
         content += `
           <div class="player-score-item ${isWinner ? 'winner' : ''} ${isEliminated ? 'eliminated' : ''}">
