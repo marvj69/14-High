@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json"> <!-- Ensure manifest.json exists -->
     <link rel="apple-touch-icon" href="icons/icon-192x192.png"> <!-- Ensure icons exist -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -278,11 +278,17 @@
         .elimination-banner {
             background-color: var(--primary); color: white; padding: 0.2rem 0.5rem; border-radius: var(--radius);
             font-weight: 500; box-shadow: var(--shadow); text-align: center; display: flex; align-items: center; gap: 0.25rem;
-            animation: fadeIn 0.3s ease-in-out; border: 1px solid rgba(0,0,0,0.1); font-size: 0.75rem; white-space: nowrap;
+            border: 1px solid rgba(0,0,0,0.1); font-size: 0.75rem; white-space: nowrap;
         }
-        #elimination-banner { position: fixed; top: 4.5rem; left: 50%; transform: translateX(-50%); z-index: 850; }
-        #round-elimination-banner { z-index: 100; } /* Inline banner */
-        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        #elimination-banner { 
+            position: fixed; top: 4.5rem; left: 50%; transform: translateX(-50%); z-index: 850; 
+            animation: fadeInFixed 0.3s ease-in-out; 
+        }
+        #round-elimination-banner { 
+            z-index: 100; /* Inline banner */
+            animation: none; /* Remove animation for inline banner to prevent jerking */
+        }
+        @keyframes fadeInFixed { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
         [data-theme="dark"] .elimination-banner { background-color: var(--primary); color: white; }
         .elimination-banner i { font-size: 0.7rem; }
 
@@ -361,45 +367,48 @@
 
         /* Game Details Modal */
         .game-details-modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1100; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.3s ease;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7);
+            display: flex; align-items: center; justify-content: center; z-index: 1100; opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
         .game-details-modal.active { opacity: 1; visibility: visible; }
         .game-details-content {
-            background-color: var(--light); border-radius: var(--radius); box-shadow: var(--shadow-md);
-            width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; position: relative;
-            border: 1px solid var(--gray-light);
+            background-color: var(--bg-color); border-radius: var(--radius); width: 90%; max-width: 500px; max-height: 90vh;
+            overflow-y: auto; padding: 1.5rem; position: relative; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
-        [data-theme="dark"] .game-details-content { background-color: var(--light-alt); border-color: var(--gray-dark); }
-        .game-details-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--gray-light); }
-        [data-theme="dark"] .game-details-header { border-bottom-color: var(--gray-dark); }
         .game-details-close {
-            background: none; color: var(--gray); border: none; cursor: pointer; font-size: 1.25rem; padding: 0.25rem;
-            width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: var(--gray);
+            font-size: 1.25rem; transition: color 0.2s ease;
         }
-        .game-details-close:hover { background-color: var(--gray-light); color: var(--dark); }
-        [data-theme="dark"] .game-details-close:hover { background-color: var(--gray-dark); color: var(--light); }
-        .game-details-title { margin: 0; font-size: 1.25rem; font-weight: 600; }
-        .game-date { font-size: 0.9rem; color: var(--gray); margin-bottom: 1rem; }
-        .game-details-winners { background-color: var(--light-alt); padding: 0.75rem; border-radius: var(--radius); margin-bottom: 1rem; border-left: 3px solid var(--success); }
-        [data-theme="dark"] .game-details-winners { background-color: var(--light); border-left-color: var(--success); }
-        .game-details-winners h4 { margin: 0; font-size: 0.9rem; color: var(--gray); margin-bottom: 0.5rem; }
-        .winner-names { font-size: 1.1rem; font-weight: 600; color: var(--success); display: flex; align-items: center; gap: 0.5rem; }
-        .winner-names i { color: var(--warning); }
-        .player-scores-list { margin-top: 1rem; }
-        .player-score-item { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--gray-light); }
-        [data-theme="dark"] .player-score-item { border-bottom-color: var(--gray-dark); }
-        .player-score-item:last-child { border-bottom: none; }
-        .player-score-name { font-weight: 500; }
-        .player-score-value { font-weight: 600; color: var(--primary); }
-        .player-score-item.winner { background-color: rgba(34, 197, 94, 0.05); }
-        [data-theme="dark"] .player-score-item.winner { background-color: rgba(74, 222, 128, 0.08); }
-        .player-score-item.eliminated { text-decoration: line-through; opacity: 0.7; }
-        [data-theme="dark"] .player-score-item.eliminated { opacity: 0.6; }
-        .player-scores-header { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; background-color: var(--light-alt); font-weight: 500; color: var(--gray); font-size: 0.85rem; border-bottom: 1px solid var(--gray-light); border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
-        [data-theme="dark"] .player-scores-header { background-color: var(--light); border-bottom-color: var(--gray-dark); }
-        .player-scores-container { border: 1px solid var(--gray-light); border-radius: var(--radius); overflow: hidden; }
-        [data-theme="dark"] .player-scores-container { border-color: var(--gray-dark); }
+        .game-details-close:hover { color: var(--danger); }
+
+        /* QR Code Modal */
+        .qr-code-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7);
+            display: flex; align-items: center; justify-content: center; z-index: 1100; opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .qr-code-modal.active { opacity: 1; visibility: visible; }
+        .qr-code-content {
+            background-color: var(--bg-color); border-radius: var(--radius); width: 90%; max-width: 350px; max-height: 90vh;
+            overflow-y: auto; padding: 1.5rem; position: relative; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        .qr-code-close {
+            position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: var(--gray);
+            font-size: 1.25rem; transition: color 0.2s ease;
+        }
+        .qr-code-close:hover { color: var(--danger); }
+        .qr-code-container {
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+        .qr-code-instructions {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-top: 1rem;
+        }
 
         /* Loading indicator (Online Mode) */
         .loading-overlay {
@@ -413,11 +422,9 @@
         .loading-message { max-width: 80%; }
 
         /* Dealer/Last Player Indicators (Online Mode) */
-        .dealer-indicator, .last-player-indicator { font-size: 0.7rem; font-weight: bold; margin-left: 0.5rem; padding: 0.1rem 0.4rem; border-radius: var(--radius); vertical-align: middle; }
+        .dealer-indicator { font-size: 0.7rem; font-weight: bold; margin-left: 0.5rem; padding: 0.1rem 0.4rem; border-radius: var(--radius); vertical-align: middle; }
         .dealer-indicator { background-color: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
-        .last-player-indicator { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
         [data-theme="dark"] .dealer-indicator { background-color: rgba(251, 191, 36, 0.2); }
-        [data-theme="dark"] .last-player-indicator { background-color: rgba(248, 113, 113, 0.2); }
         input.bid-input:disabled { background-color: var(--gray-light); cursor: not-allowed; opacity: 0.7; }
         [data-theme="dark"] input.bid-input:disabled { background-color: var(--gray-dark); }
 
@@ -426,11 +433,28 @@
             background-color: var(--light-alt); border: 1px dashed var(--gray-light); border-radius: var(--radius);
             padding: 0.75rem 1rem; margin-bottom: 1rem; font-family: monospace; font-size: 0.9rem; color: var(--primary);
             display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background-color 0.2s ease;
+            position: relative; text-align: center;
         }
-        .game-id-display:hover { background-color: var(--light); }
+        .game-id-display:hover { 
+            background-color: var(--light); 
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .game-id-display:after {
+            content: 'Click to show QR code';
+            display: block;
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            background: var(--bg-color);
+            padding: 0 8px;
+            color: var(--gray);
+            font-family: sans-serif;
+        }
         [data-theme="dark"] .game-id-display { background-color: var(--gray-dark); border-color: var(--gray); color: var(--primary); }
         [data-theme="dark"] .game-id-display:hover { background-color: var(--dark-alt); }
-        .game-id-display span { overflow-wrap: break-word; word-break: break-all; margin-right: 0.5rem; }
+        [data-theme="dark"] .game-id-display:after { background-color: var(--dark); }
         .copy-feedback { margin-left: 0.5rem; font-size: 0.8rem; color: var(--success); opacity: 0; transition: opacity 0.3s ease; }
         .copy-feedback.visible { opacity: 1; }
         .divider { text-align: center; margin: 1.5rem 0; color: var(--gray); font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; }
@@ -480,13 +504,94 @@
             margin-bottom: 1.5rem;
             min-height: 3em; /* Ensure cards have similar height */
          }
+
+        /* Button Styles */
+        .btn-small {
+            background-color: var(--gray-light);
+            color: var(--gray);
+            border: none;
+            border-radius: var(--radius);
+            padding: 0.25rem 0.75rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .btn-small:hover {
+            background-color: var(--gray);
+            color: var(--light);
+        }
+        [data-theme="dark"] .btn-small {
+            background-color: var(--gray-dark);
+            color: var(--light);
+        }
+        [data-theme="dark"] .btn-small:hover {
+            background-color: var(--gray);
+        }
+
+        /* QR code small button */
+        #show-qr-btn {
+            padding: 0.5rem 0.7rem;
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+            height: 2.3rem;
+            width: 2.3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+        }
+
+        /* Text button for copy */
+        .btn-text {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary);
+            transition: color 0.2s ease;
+            padding: 0;
+            margin: 0;
+        }
+        .btn-text:hover {
+            color: var(--success);
+        }
+        [data-theme="dark"] .btn-text {
+            color: var(--primary-light);
+        }
+        [data-theme="dark"] .btn-text:hover {
+            color: var(--success);
+        }
     </style>
+    <!-- QR Code library (changed to CDN version) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body data-theme="light">
-    <!-- Loading Overlay (Primarily for Online Mode) -->
-    <div class="loading-overlay" id="loading-overlay">
-        <i class="fas fa-spinner fa-spin"></i>
-        <span class="loading-message">Connecting...</span>
+    <!-- Game Details Modal -->
+    <div id="game-details-modal" class="game-details-modal">
+      <div class="game-details-content">
+        <button id="game-details-close" class="game-details-close" aria-label="Close game details"><i class="fas fa-times"></i></button>
+        <div id="game-details-body"></div>
+      </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qr-code-modal" class="qr-code-modal">
+      <div class="qr-code-content">
+        <button id="qr-code-close" class="qr-code-close" aria-label="Close QR code"><i class="fas fa-times"></i></button>
+        <h3><i class="fas fa-qrcode"></i> Game QR Code</h3>
+        <div class="qr-code-container" id="qr-code-container"></div>
+        <div class="qr-code-instructions">
+          Other players can scan this QR code with their phone to automatically join your game
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+      <i class="fas fa-spinner fa-spin"></i>
+      <div class="loading-message" id="loading-message">Loading...</div>
     </div>
 
     <div class="fixed-header"></div>
@@ -532,11 +637,11 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.0.0-Combined</span> <!-- Updated Version -->
+        <span>v2.0.1</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
-            <h3>14-High! v2.0.0-Combined</h3>
+            <h3>14-High!</h3>
             <button class="close-btn" id="version-close" aria-label="Close version info">
                 <i class="fas fa-times"></i>
             </button>
@@ -555,19 +660,6 @@
         </div>
     </div>
 
-    <!-- Game Details Modal -->
-    <div class="game-details-modal" id="game-details-modal">
-        <div class="game-details-content">
-            <div class="game-details-header">
-                <h3 class="game-details-title">Game Details</h3>
-                <button class="game-details-close" id="game-details-close" aria-label="Close game details">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="game-details-body"></div>
-        </div>
-    </div>
-
     <!-- Firebase SDK (Only needed for Online mode) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -579,6 +671,9 @@
         const LOCAL_STORAGE_OFFLINE_KEY = 'offlineGameState';
         const LOCAL_STORAGE_HISTORY_KEY = 'completedGames'; // Shared history key
         const LOCAL_STORAGE_THEME_KEY = 'theme';
+        const DEBOUNCE_DELAY = 300; // Debounce delay in milliseconds for online input
+        const RENDER_THROTTLE = 300; // Increased from 150ms to 300ms for smoother rendering
+        const FIREBASE_UPDATE_BUFFER = 50; // Additional delay before rendering after Firebase updates
 
         // IMPORTANT: Replace with your actual Firebase config if using Online mode
         const firebaseConfig = {
@@ -604,6 +699,11 @@
         let firebaseConnected = false;
         let initialConnectionEstablished = false;
         let previousHtml = ''; // Track previous HTML for diffing
+        let darkMode = false;
+        let pendingUpdates = {}; // Store pending Firebase updates
+        let debounceTimers = {}; // Store debounce timers
+        let lastRenderTime = 0; // Track last render time for throttling
+        let pendingRender = false; // Track if render is pending
 
         // --- DOM Elements ---
         const app = document.getElementById('app');
@@ -625,11 +725,74 @@
 
         // --- Initialization ---
         function initializeApp() {
-            console.log("Initializing 14-High! Combined App");
-            applyTheme(localStorage.getItem(LOCAL_STORAGE_THEME_KEY) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+            // Load theme preference
+            const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
+            if (savedTheme === 'dark') {
+                darkMode = true;
+                document.body.setAttribute('data-theme', 'dark');
+                if (darkModeToggle) darkModeToggle.checked = true;
+            }
+
+            // Load completed games history
             loadLocalHistory();
-            setupCommonEventListeners();
-            renderApp(); // Render the initial entry screen
+
+            // Initialize Firebase if Online mode
+            if (window.location.search.includes('game=')) {
+                // When launched via QR code with game parameter, go straight to online mode
+                selectMode('online');
+                // joinOnlineGame will handle the URL parameter automatically
+            } else {
+                // Normal startup - render initial screen
+                renderApp();
+            }
+
+            // Set up click handlers (Delegated)
+            app.addEventListener('click', handleAppClick);
+            document.body.addEventListener('keypress', handleAppKeyPress);
+            app.addEventListener('input', handleAppInput);
+
+            // Menu and mode select handlers
+            hamburgerBtn.addEventListener('click', () => menuContent.classList.add('active'));
+            menuClose.addEventListener('click', () => menuContent.classList.remove('active'));
+            gameDetailsClose.addEventListener('click', closeGameDetailsModal);
+            gameDetailsModal.addEventListener('click', (e) => {
+                if (e.target === gameDetailsModal) closeGameDetailsModal();
+            });
+            // Dark mode toggle
+            darkModeToggle.addEventListener('change', () => {
+                darkMode = darkModeToggle.checked;
+                document.body.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+                localStorage.setItem(LOCAL_STORAGE_THEME_KEY, darkMode ? 'dark' : 'light');
+            });
+
+            // Menu back button
+            menuBackButton.addEventListener('click', goBackToEntry);
+
+            // Completed games list item click
+            completedGamesList.addEventListener('click', (e) => {
+                const gameItem = e.target.closest('.completed-game-item');
+                if (gameItem) {
+                    const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
+                    if (!isNaN(gameIndex)) showGameDetails(gameIndex);
+                }
+            });
+
+            // Check for elimination warning for online games
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && currentMode === 'online-game' && onlineState.gameStarted) {
+                    // Re-check elimination warning when tab becomes visible
+                     checkUpcomingElimination(onlineState);
+                }
+            });
+
+            // Elimination banner dismiss
+            if (eliminationBanner) {
+                eliminationBanner.addEventListener('click', (e) => {
+                    if (e.target.closest('.elimination-dismiss')) {
+                        eliminationBanner.style.display = 'none';
+                    }
+                });
+            }
         }
 
         function setupCommonEventListeners() {
@@ -852,11 +1015,42 @@
                 }
             }
 
+            // QR code button
+            if (target.closest('#show-qr-btn') && currentMode === 'online-game' && currentGameId) {
+                showQRCode(currentGameId);
+                return;
+            }
+
             // Game ID Copy (Online Mode)
             const gameIdDisplay = target.closest('.game-id-display');
-            if (gameIdDisplay && currentMode === 'online-game') {
+            if (gameIdDisplay && (currentMode === 'online-game' || currentMode === 'online-entry')) {
                 const gameId = gameIdDisplay.getAttribute('data-game-id');
-                if (gameId) copyGameIdToClipboard(gameId, gameIdDisplay);
+                if (gameId) {
+                    // Show QR code for the entire game-id-display
+                    showQRCode(gameId);
+                }
+            }
+            
+            // Copy button
+            const copyBtn = target.closest('.copy-id-btn');
+            if (copyBtn) {
+                const gameId = copyBtn.getAttribute('data-game-id');
+                if (gameId) {
+                    const feedbackId = currentMode === 'online-game' ? 
+                        `copy-feedback-gameplay-${gameId}` : `copy-feedback-${gameId}`;
+                    const feedbackEl = document.getElementById(feedbackId);
+                    
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(gameId).then(() => {
+                        if (feedbackEl) {
+                            feedbackEl.classList.add('visible');
+                            setTimeout(() => feedbackEl.classList.remove('visible'), 1500);
+                        }
+                    }).catch(err => { 
+                        console.error('Failed to copy:', err); 
+                        alert('Copy failed.'); 
+                    });
+                }
             }
         }
 
@@ -918,6 +1112,39 @@
              }
         }
 
+        // Add debounce function to prevent excessive Firebase updates
+        function debounce(func, delay, key) {
+            return function(...args) {
+                if (debounceTimers[key]) {
+                    clearTimeout(debounceTimers[key]);
+                }
+                debounceTimers[key] = setTimeout(() => {
+                    func.apply(this, args);
+                    delete debounceTimers[key];
+                }, delay);
+            };
+        }
+
+        // Add throttle function to prevent excessive rendering
+        function throttledRender() {
+            const now = Date.now();
+            if (now - lastRenderTime >= RENDER_THROTTLE) {
+                renderApp();
+                lastRenderTime = now;
+                pendingRender = false;
+            } else if (!pendingRender) {
+                pendingRender = true;
+                setTimeout(() => {
+                    // Only render if no more updates have come in during the wait
+                    if (pendingRender) {
+                        renderApp();
+                        lastRenderTime = Date.now();
+                        pendingRender = false;
+                    }
+                }, RENDER_THROTTLE - (now - lastRenderTime));
+            }
+        }
+
         function handleAppInput(e) {
             const target = e.target;
 
@@ -935,10 +1162,11 @@
                      if (player) handleTricksChangeOffline(player, value);
                  }
             }
-            // Online Input Handling (Write to Firebase)
+            // Online Input Handling (Write to Firebase) - Now with debouncing
             else if (currentMode === 'online-game') {
                 const bidInput = target.closest('.bid-input');
                 const trickInput = target.closest('.trick-input');
+                
                 if (bidInput && onlineState.gameStarted && onlineState.bidPhase && !bidInput.disabled && gameRef) {
                     const player = bidInput.getAttribute('data-player');
                     const value = bidInput.value;
@@ -950,32 +1178,52 @@
                             bidInput.value = onlineState.bids[player] ?? ''; // Revert UI immediately
                             return;
                         }
-                         // Last player check *before* writing
-                        if (isLastPlayer(player, onlineState)) {
+                        // Dealer check *before* writing
+                        if (isDealer(player, onlineState)) {
                             const potentialTotal = calculatePotentialBidTotal(player, bidValue, onlineState);
                             if (potentialTotal === onlineState.currentRound) {
                                 updateValidationAndButtons(); // Show warning but don't write
                                 return;
                             }
                         }
-                        gameRef.child('bids').child(player).set(bidValue)
-                           .catch(err => console.error(`Firebase bid write failed:`, err));
-                        updateValidationAndButtons(); // Update UI hints faster
+                        
+                        // Store data locally first for immediate feedback BUT DON'T RENDER YET
+                        if (!onlineState.bids) onlineState.bids = {};
+                        onlineState.bids[player] = bidValue;
+                        updateValidationAndButtons(); // Update UI hints immediately without full rerender
+                        
+                        // Debounce Firebase update
+                        const updateBid = debounce((playerName, value) => {
+                            gameRef.child('bids').child(playerName).set(value)
+                               .catch(err => console.error(`Firebase bid write failed:`, err));
+                        }, DEBOUNCE_DELAY, `bid-${player}`);
+                        
+                        updateBid(player, bidValue);
                     }
                 } else if (trickInput && onlineState.gameStarted && !onlineState.bidPhase && gameRef) {
                     const player = trickInput.getAttribute('data-player');
                     const value = trickInput.value;
                     const tricksValue = value === '' ? null : parseInt(value);
 
-                     if (player && tricksValue !== undefined) {
-                         if (tricksValue !== null && (isNaN(tricksValue) || tricksValue < 0 || tricksValue > 14)) {
-                             trickInput.value = onlineState.tricks[player] ?? ''; // Revert UI immediately
-                             return;
-                         }
-                        gameRef.child('tricks').child(player).set(tricksValue)
-                           .catch(err => console.error(`Firebase trick write failed:`, err));
-                         updateValidationAndButtons(); // Update UI hints faster
-                     }
+                    if (player && tricksValue !== undefined) {
+                        if (tricksValue !== null && (isNaN(tricksValue) || tricksValue < 0 || tricksValue > 14)) {
+                            trickInput.value = onlineState.tricks[player] ?? ''; // Revert UI immediately
+                            return;
+                        }
+                        
+                        // Store data locally first for immediate feedback BUT DON'T RENDER YET
+                        if (!onlineState.tricks) onlineState.tricks = {};
+                        onlineState.tricks[player] = tricksValue;
+                        updateValidationAndButtons(); // Update UI hints immediately without full rerender
+                        
+                        // Debounce Firebase update
+                        const updateTrick = debounce((playerName, value) => {
+                            gameRef.child('tricks').child(playerName).set(value)
+                               .catch(err => console.error(`Firebase trick write failed:`, err));
+                        }, DEBOUNCE_DELAY, `trick-${player}`);
+                        
+                        updateTrick(player, tricksValue);
+                    }
                 }
             }
         }
@@ -1006,12 +1254,49 @@
                 newHtml = '<div class="card"><p>Error: Invalid application state.</p></div>';
             }
 
-            // Simple diffing to reduce DOM manipulation
-            if (newHtml !== previousHtml) {
-                app.innerHTML = newHtml;
-                previousHtml = newHtml;
-                applyPostRenderFocus(currentState);
+            // Don't rerender if the HTML hasn't changed - prevents jitter
+            if (newHtml === previousHtml) {
+                return;
             }
+            
+            // More efficient DOM update strategy to minimize flicker
+            // Create a temporary div to parse the HTML
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = newHtml;
+            
+            // Cache active element before DOM update
+            const activeElement = document.activeElement;
+            const activeId = activeElement ? activeElement.id : null;
+            const activeDataPlayer = activeElement ? activeElement.getAttribute('data-player') : null;
+            const activeSelectionStart = activeElement && 'selectionStart' in activeElement ? activeElement.selectionStart : null;
+            const activeSelectionEnd = activeElement && 'selectionEnd' in activeElement ? activeElement.selectionEnd : null;
+            
+            // Update the DOM
+            app.innerHTML = newHtml;
+            previousHtml = newHtml;
+            
+            // Try to restore focus with selection if possible
+            if (activeId) {
+                const newActiveElement = document.getElementById(activeId);
+                if (newActiveElement) {
+                    newActiveElement.focus();
+                    if (activeSelectionStart !== null && activeSelectionEnd !== null && 'selectionStart' in newActiveElement) {
+                        newActiveElement.selectionStart = activeSelectionStart;
+                        newActiveElement.selectionEnd = activeSelectionEnd;
+                    }
+                }
+            } else if (activeDataPlayer) {
+                const newActiveElements = document.querySelectorAll(`[data-player="${activeDataPlayer}"]`);
+                if (newActiveElements.length > 0) {
+                    newActiveElements[0].focus();
+                    if (activeSelectionStart !== null && activeSelectionEnd !== null && 'selectionStart' in newActiveElements[0]) {
+                        newActiveElements[0].selectionStart = activeSelectionStart;
+                        newActiveElements[0].selectionEnd = activeSelectionEnd;
+                    }
+                }
+            }
+            
+            applyPostRenderFocus(currentState);
 
             // Always update validation/buttons after render, especially for online mode updates
             if (currentMode === 'offline' || currentMode === 'online-game') {
@@ -1023,6 +1308,41 @@
         }
 
         function applyPostRenderFocus(currentState) {
+            // Preserve the currently focused element
+            const activeElementId = document.activeElement ? document.activeElement.id : '';
+            const activeElementSelector = document.activeElement ? 
+                (document.activeElement.getAttribute('data-player') ? 
+                    `.${document.activeElement.classList[0]}[data-player="${document.activeElement.getAttribute('data-player')}"]` : 
+                    '') : 
+                '';
+            const hadFocus = document.activeElement && 
+                (document.activeElement.classList.contains('bid-input') || 
+                 document.activeElement.classList.contains('trick-input'));
+            const selectionStart = hadFocus ? document.activeElement.selectionStart : null;
+            const selectionEnd = hadFocus ? document.activeElement.selectionEnd : null;
+
+            // Try to restore focus to the same element
+            if (hadFocus && activeElementSelector) {
+                const elementToFocus = document.querySelector(activeElementSelector);
+                if (elementToFocus) {
+                    elementToFocus.focus();
+                    if (selectionStart !== null && selectionEnd !== null) {
+                        elementToFocus.selectionStart = selectionStart;
+                        elementToFocus.selectionEnd = selectionEnd;
+                    } else {
+                        elementToFocus.select();
+                    }
+                    return; // Exit early - we've restored focus
+                }
+            } else if (activeElementId) {
+                const elementToFocus = document.getElementById(activeElementId);
+                if (elementToFocus) {
+                    elementToFocus.focus();
+                    return; // Exit early - we've restored focus
+                }
+            }
+            
+            // Default focus behavior if we can't restore previous focus
             if (currentMode === 'entry') {
                  const offlineBtn = document.getElementById('select-offline-btn');
                  if (offlineBtn) offlineBtn.focus();
@@ -1058,8 +1378,8 @@
 
             const totalBids = calculateTotalBids(state.bids);
             const totalTricks = calculateTotalTricks(state.tricks);
-            const lastPlayer = (currentMode === 'online-game') ? getLastPlayerName(state) : null; // Only relevant online
-            const lastPlayerBid = (lastPlayer && state.bids && state.bids[lastPlayer] !== undefined && state.bids[lastPlayer] !== null) ? state.bids[lastPlayer] : undefined;
+            const dealerName = (currentMode === 'online-game') ? getDealerName(state) : null; // Only relevant online
+            const dealerBid = (dealerName && state.bids && state.bids[dealerName] !== undefined && state.bids[dealerName] !== null) ? state.bids[dealerName] : undefined;
             const players = state.players || [];
 
             // --- Update Bid Info/Warning ---
@@ -1067,7 +1387,7 @@
             if (bidInfoEl && state.bidPhase) {
                 if (allPlayersHaveBid(state)) {
                     if (totalBids === state.currentRound) {
-                        bidInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Invalid: Total bids cannot equal ${state.currentRound} (currently ${totalBids}). ${lastPlayer ? escapeHtml(lastPlayer) + ' must change bid.' : ''}`;
+                        bidInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Invalid: Total bids cannot equal ${state.currentRound} (currently ${totalBids}). ${dealerName ? escapeHtml(dealerName) + ' must change bid.' : ''}`;
                         bidInfoEl.className = 'game-info bid-warning';
                     } else {
                         bidInfoEl.innerHTML = `<i class="fas fa-check-circle"></i> Valid Bids: Total ${totalBids}`;
@@ -1186,10 +1506,15 @@
              const gameIdHtml = isOnline && currentGameId ? `
                  <div style="margin-bottom: 1.5rem;">
                     <h3 style="font-size: 0.9rem; color: var(--gray); margin-bottom: 0.5rem;">Share this Game ID:</h3>
-                    <div class="game-id-display" data-game-id="${escapeHtml(currentGameId)}" title="Click to copy Game ID">
-                        <span>${escapeHtml(currentGameId)}</span>
-                        <i class="far fa-copy"></i>
-                        <span class="copy-feedback" id="copy-feedback-${escapeHtml(currentGameId)}">Copied!</span>
+                    <div class="game-id-display" data-game-id="${escapeHtml(currentGameId)}" title="Click to show QR code">
+                        <span style="overflow-wrap: break-word; word-break: break-all; margin: 0 auto;">${escapeHtml(currentGameId)}</span>
+                        <i class="fas fa-qrcode" style="margin-left: 8px;"></i>
+                    </div>
+                    <div style="display: flex; justify-content: center; margin-top: 0.5rem;">
+                        <button class="btn-small copy-id-btn" data-game-id="${escapeHtml(currentGameId)}">
+                            <i class="far fa-copy"></i> Copy ID
+                        </button>
+                        <span class="copy-feedback" id="copy-feedback-${escapeHtml(currentGameId)}" style="margin-left: 0.5rem; line-height: 1.8;">Copied!</span>
                     </div>
                  </div>
               ` : '';
@@ -1254,15 +1579,20 @@
             const tricks = currentState.tricks || {};
             const bidPhase = currentState.bidPhase === undefined ? true : currentState.bidPhase;
             const dealerName = isOnline ? getDealerName(currentState) : null;
-            const lastPlayerName = isOnline ? getLastPlayerName(currentState) : null;
 
             // --- Round Input / Game Over ---
             if (currentRound <= 14) {
                 const bidInfoHtml = bidPhase ? '<div id="bid-info" class="game-info"></div>' : '';
                 const tricksInfoHtml = !bidPhase ? '<div id="trick-info" class="game-info"></div>' : '';
                 const gameIdHeaderHtml = isOnline && currentGameId ? `
-                    <div style="font-size: 0.8rem; color: var(--gray); text-align: right; margin-bottom: 0.5rem;">
-                        Game ID: ${escapeHtml(currentGameId)}
+                    <div>
+                        <div style="font-size: 0.8rem; margin-bottom: 0.5rem; text-align: center; color: var(--gray);">
+                            Game ID: ${escapeHtml(currentGameId)}
+                            <button class="btn-text copy-id-btn" data-game-id="${escapeHtml(currentGameId)}" style="margin-left: 0.5rem; font-size: 0.8rem; padding: 0.2rem 0.4rem;">
+                                <i class="far fa-copy"></i>
+                            </button>
+                            <span class="copy-feedback" id="copy-feedback-gameplay-${escapeHtml(currentGameId)}" style="margin-left: 0.2rem; font-size: 0.7rem;">Copied!</span>
+                        </div>
                     </div>` : '';
 
                 gameplayHtml += `
@@ -1273,7 +1603,7 @@
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                         <span class="game-status">${bidPhase ? 'Bidding Phase' : 'Enter Hands Won'}</span>
                         ${dealerName ? `<span class="game-status" style="background-color: rgba(245,158,11,0.1); color: var(--warning); border: 1px solid rgba(245,158,11,0.3);"><i class="fas fa-star"></i> Dealer: ${escapeHtml(dealerName)}</span>`: ''}
-                        <div id="round-elimination-banner" style="display: none;" class="elimination-banner">
+                        <div id="round-elimination-banner" style="display: none; position: static;" class="elimination-banner">
                         <i class="fas fa-exclamation-triangle"></i>
                         <span id="round-elimination-message">Upcoming elimination</span>
                         </div>
@@ -1295,12 +1625,10 @@
                         <tbody>
                         ${players.map(player => {
                             const isDealer = player === dealerName;
-                            const isLast = player === lastPlayerName;
                             const bidValue = bids[player] ?? '';
                             const trickValue = tricks[player] ?? '';
                             let playerIndicators = '';
                             if (isDealer) playerIndicators += ' <span class="dealer-indicator">D</span>';
-                            if (bidPhase && isLast) playerIndicators += ' <span class="last-player-indicator">Last</span>';
 
                             return `
                             <tr>
@@ -1409,6 +1737,7 @@
                          ${!isOnline ? `<button id="undo-round-btn" class="btn-outline"><i class="fas fa-undo-alt"></i> Undo Round</button>` : ''}
                          <button id="leave-game-btn" class="btn-leave-game"><i class="fas fa-sign-out-alt"></i> Leave</button>
                          <button id="reset-game-btn" class="btn-red"><i class="fas fa-power-off"></i> Reset Game</button>
+                         ${isOnline && currentGameId ? `<button id="show-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i></button>` : ''}
                     </div>
                     <p>Round ${currentRound} / 14</p>
                     </div>
@@ -1676,36 +2005,59 @@
         }
 
         function joinOnlineGame() {
-             if (!firebaseConnected) { alert("Not connected to Firebase."); return; }
-             const joinInput = document.getElementById('join-game-id-input');
-             const errorEl = document.getElementById('join-error');
-             if (!joinInput || !errorEl) return;
-
-             const gameIdToJoin = joinInput.value.trim();
-             errorEl.textContent = '';
-
-             if (!gameIdToJoin) { errorEl.textContent = 'Please enter a Game ID.'; joinInput.focus(); return; }
-
-             setLoading(true, `Checking Game ID: ${gameIdToJoin}...`);
-
-             firebase.database().ref(`games/${gameIdToJoin}`).once('value')
-                .then(snapshot => {
-                    if (snapshot.exists()) {
-                        console.log(`Joining online game: ${gameIdToJoin}`);
-                        currentGameId = gameIdToJoin;
-                        currentMode = 'online-game';
-                        attachGameListener(currentGameId); // Listener handles render and loading state
-                    } else {
-                        errorEl.textContent = 'Invalid Game ID. Please check and try again.';
-                        joinInput.focus();
-                        setLoading(false);
+            const joinIdInput = document.getElementById('join-game-id-input');
+            const joinErrorEl = document.getElementById('join-error');
+            let gameId = joinIdInput ? joinIdInput.value.trim() : '';
+            
+            // Check if there's a game ID in the URL (from QR code scanning)
+            if (!gameId) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const qrGameId = urlParams.get('game');
+                if (qrGameId) {
+                    gameId = qrGameId;
+                    // Update the input field if it exists
+                    if (joinIdInput) {
+                        joinIdInput.value = gameId;
                     }
-                })
-                .catch(err => {
-                    console.error("Error checking game ID:", err);
-                    errorEl.textContent = 'Error connecting to check Game ID.';
+                    // Clean the URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
+            
+            if (!gameId) {
+                if (joinErrorEl) joinErrorEl.textContent = 'Please enter a Game ID';
+                return;
+            }
+
+            if (!firebaseInitialized) {
+                initializeFirebaseIfNeeded();
+                // If Firebase fails to initialize, the firebaseInitialized flag remains false
+                if (!firebaseInitialized) {
+                    if (joinErrorEl) joinErrorEl.textContent = 'Failed to initialize online services';
+                    return;
+                }
+            }
+
+            setLoading(true, 'Joining game...');
+            const database = firebase.database();
+
+            // Check if the game exists
+            database.ref(`/games/${gameId}`).once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    currentGameId = gameId;
+                    currentMode = 'online-game'; // Set to game mode immediately
+                    onlineState = {}; // Reset local state
+                    menuBackButton.style.display = 'inline-block';
+                    attachGameListener(gameId);
+                } else {
                     setLoading(false);
-                });
+                    if (joinErrorEl) joinErrorEl.textContent = 'Game not found. Check the Game ID and try again.';
+                }
+            }).catch(err => {
+                console.error('Error checking game existence:', err);
+                setLoading(false);
+                if (joinErrorEl) joinErrorEl.textContent = err.message || 'Error checking game. Please try again.';
+            });
         }
 
         function leaveOnlineGame(renderEntry = true) {
@@ -1749,19 +2101,48 @@
                          eliminatedPlayers: firebaseState.eliminatedPlayers || [],
                          createdAt: firebaseState.createdAt // Keep track if needed
                      };
+                     
+                     // Check for completed game data and save it to local history for this user
+                     if (firebaseState.completedGameData && firebaseState.completedGameData.completed) {
+                         const localGame = localHistory.find(g => g.gameId === currentGameId && g.mode === 'online');
+                         // Only save if this game hasn't been saved locally before
+                         if (!localGame) {
+                             const completedGame = {
+                                 mode: 'online',
+                                 gameId: currentGameId,
+                                 date: firebaseState.completedGameData.date,
+                                 winners: firebaseState.completedGameData.winners,
+                                 score: firebaseState.completedGameData.score,
+                                 players: firebaseState.completedGameData.players,
+                                 finalScores: firebaseState.completedGameData.finalScores,
+                                 eliminatedPlayers: firebaseState.completedGameData.eliminatedPlayers
+                             };
+                             
+                             localHistory = JSON.parse(localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY)) || [];
+                             localHistory.push(completedGame);
+                             localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(localHistory));
+                             renderCompletedGames();
+                             console.log(`Saved completed online game ${currentGameId} to local history.`);
+                         }
+                     }
+                     
                      console.log(`Firebase data received for game ${currentGameId}`);
                      currentMode = 'online-game'; // Ensure mode is correct
-                     renderApp(); // Re-render with new data
-                 } else {
-                     console.warn(`Game data for ${currentGameId} is null (deleted?).`);
-                     alert(`Game ${currentGameId} doesn't exist or was deleted.`);
-                     leaveOnlineGame(true); // Go back to online entry
-                 }
-            }, (error) => {
-                console.error(`Firebase read failed for game ${currentGameId}:`, error);
+                     
+                     // Add a small buffer delay before rendering to allow for closely timed Firebase updates
+                     // This prevents multiple renders when Firebase sends multiple updates in quick succession
+                     setTimeout(() => {
+                         throttledRender();
+                     }, FIREBASE_UPDATE_BUFFER);
+                } else {
+                     console.error("Firebase returned null value for game");
+                     alert("Game not found. It may have been deleted.");
+                     leaveOnlineGame(true);
+                }
+            }, (err) => {
+                console.error("Firebase listener error:", err);
                 setLoading(false);
-                alert(`Error loading game ${currentGameId}. Please try rejoining.`);
-                leaveOnlineGame(true);
+                alert(`Error receiving game updates: ${err.message}`);
             });
         }
 
@@ -1865,33 +2246,45 @@
 
         function submitRoundResultsOnline() {
             if (!firebaseConnected || !gameRef || !onlineState) return;
-            if (!allTricksEntered(onlineState) || !validateTricksTotal(onlineState)) { alert("Invalid hands won. Check totals and ensure all players entered hands."); return; }
+            if (!allTricksEntered(onlineState)) { alert("All tricks must be entered."); return; }
 
-            // Calculations based on current onlineState cache
-            const currentScores = { ...(onlineState.scores || {}) };
             const activePlayers = [...(onlineState.players || [])];
-            let newEliminatedPlayer = null;
+            if (activePlayers.length === 0) return;
 
-            activePlayers.forEach(player => {
-                const bid = onlineState.bids[player];
-                const tricks = onlineState.tricks[player];
-                if (typeof bid === 'number' && typeof tricks === 'number') {
-                    let roundScore = (bid === tricks) ? (bid === 0 ? 10 : tricks + (10 * bid)) : tricks;
-                    currentScores[player] = (currentScores[player] || 0) + roundScore;
+            const currentScores = { ...onlineState.scores };
+            const round = onlineState.currentRound;
+
+            // Calculate scores for this round
+            activePlayers.forEach(playerName => {
+                const playerBid = onlineState.bids[playerName] || 0;
+                const playerTricks = onlineState.tricks[playerName] || 0;
+                let roundScore = 0;
+
+                if (playerBid === playerTricks) {
+                    roundScore = (playerBid === 0) ? 10 : playerTricks + (10 * playerBid);
+                } else {
+                    roundScore = playerTricks;
                 }
+
+                currentScores[playerName] = (currentScores[playerName] || 0) + roundScore;
             });
 
-            let nextRound = onlineState.currentRound;
-            let nextDealerIndex = onlineState.dealerIndex;
-            let gameIsOver = false;
-            let nextEliminatedPlayers = [...(onlineState.eliminatedPlayers || [])];
+            // Prepare for next round
+            let nextRound = round;
+            let nextDealerIndex = onlineState.dealerIndex || 0;
             let nextActivePlayers = [...activePlayers];
+            let nextEliminatedPlayers = [...(onlineState.eliminatedPlayers || [])];
+            let newEliminatedPlayer = null;
+            let gameIsOver = false;
+
+            // Prepare updates for Firebase
+            const updates = {};
 
             if (onlineState.currentRound < 14) {
                 nextRound++;
                 nextDealerIndex = activePlayers.length > 0 ? (onlineState.dealerIndex + 1) % activePlayers.length : 0;
 
-                newEliminatedPlayer = checkElimination(currentScores, nextActivePlayers, nextRound); // Check based on NEW scores and NEXT round
+                newEliminatedPlayer = checkElimination(currentScores, nextActivePlayers, nextRound); // Pass scores, players and next round number
                 if (newEliminatedPlayer) {
                     // Alert locally - maybe improve this UX later
                     alert(`Player "${escapeHtml(newEliminatedPlayer)}" eliminated! (Lowest score: ${currentScores[newEliminatedPlayer]})`);
@@ -1909,18 +2302,30 @@
             } else {
                 nextRound = 15; // Game over
                 gameIsOver = true;
-                 // Prepare final state to save to local history
-                 const finalStateForHistory = {
-                     ...onlineState, // Include current bids/tricks etc.
-                     scores: currentScores, // Use the just calculated final scores
-                     players: nextActivePlayers, // Final active players
-                     eliminatedPlayers: nextEliminatedPlayers // Final eliminated players
-                 };
-                 saveCompletedGameToLocal(finalStateForHistory, 'online');
+                // Prepare final state to save to local history
+                const finalStateForHistory = {
+                    ...onlineState, // Include current bids/tricks etc.
+                    scores: currentScores, // Use the just calculated final scores
+                    players: nextActivePlayers, // Final active players
+                    eliminatedPlayers: nextEliminatedPlayers // Final eliminated players
+                };
+                saveCompletedGameToLocal(finalStateForHistory, 'online');
+                
+                // For online games that are over, store completed game information in Firebase
+                // so that all players who were in the game can access it
+                const winners = getWinners(finalStateForHistory);
+                const completedGameData = {
+                    date: new Date().toISOString(),
+                    winners: winners,
+                    score: winners.length > 0 ? (finalStateForHistory.scores[winners[0]] || 0) : 0,
+                    players: [...(finalStateForHistory.players || [])],
+                    finalScores: { ...(finalStateForHistory.scores || {}) },
+                    eliminatedPlayers: [...(finalStateForHistory.eliminatedPlayers || [])],
+                    completed: true
+                };
+                updates['/completedGameData'] = completedGameData;
             }
-
-            // Prepare updates for Firebase
-            const updates = {};
+            
             updates['/scores'] = currentScores;
             updates['/currentRound'] = nextRound;
             updates['/bidPhase'] = true;
@@ -1933,13 +2338,13 @@
             const resetTricks = {};
             nextActivePlayers.forEach(p => { resetBids[p] = null; resetTricks[p] = null; });
             // Preserve bids/tricks of previously eliminated players
-             (onlineState.eliminatedPlayers || []).forEach(p => {
-                 if (onlineState.bids[p] !== undefined) resetBids[p] = onlineState.bids[p];
-                 if (onlineState.tricks[p] !== undefined) resetTricks[p] = onlineState.tricks[p];
-             });
-              // Preserve bids/tricks of newly eliminated player
-             if (newEliminatedPlayer && onlineState.bids[newEliminatedPlayer] !== undefined) resetBids[newEliminatedPlayer] = onlineState.bids[newEliminatedPlayer];
-             if (newEliminatedPlayer && onlineState.tricks[newEliminatedPlayer] !== undefined) resetTricks[newEliminatedPlayer] = onlineState.tricks[newEliminatedPlayer];
+            (onlineState.eliminatedPlayers || []).forEach(p => {
+                if (onlineState.bids[p] !== undefined) resetBids[p] = onlineState.bids[p];
+                if (onlineState.tricks[p] !== undefined) resetTricks[p] = onlineState.tricks[p];
+            });
+            // Preserve bids/tricks of newly eliminated player
+            if (newEliminatedPlayer && onlineState.bids[newEliminatedPlayer] !== undefined) resetBids[newEliminatedPlayer] = onlineState.bids[newEliminatedPlayer];
+            if (newEliminatedPlayer && onlineState.tricks[newEliminatedPlayer] !== undefined) resetTricks[newEliminatedPlayer] = onlineState.tricks[newEliminatedPlayer];
 
             updates['/bids'] = resetBids;
             updates['/tricks'] = resetTricks;
@@ -2017,11 +2422,19 @@
         }
 
         function setLoading(isLoading, message = 'Loading...') {
-            const msgElement = loadingOverlay.querySelector('.loading-message');
-            if (!loadingOverlay || !msgElement) return;
-            msgElement.innerHTML = message;
-            if (isLoading) loadingOverlay.classList.add('active');
-            else loadingOverlay.classList.remove('active');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const loadingMessage = document.getElementById('loading-message');
+            
+            if (!loadingOverlay) return;
+            
+            if (isLoading) {
+                loadingOverlay.classList.add('active');
+                if (loadingMessage) {
+                    loadingMessage.innerHTML = message;
+                }
+            } else {
+                loadingOverlay.classList.remove('active');
+            }
         }
 
         function getDealerName(currentState) { // Online only helper
@@ -2030,20 +2443,6 @@
             const index = currentState.dealerIndex ?? 0;
             const adjustedIndex = Math.max(0, Math.min(index, players.length - 1));
             return players[adjustedIndex];
-        }
-
-        function getLastPlayerName(currentState) { // Online only helper
-            const players = currentState.players || [];
-            if (!currentState.gameStarted || players.length < 2) return null;
-            const numPlayers = players.length;
-            const dealerIdx = currentState.dealerIndex ?? 0;
-            const adjustedDealerIndex = Math.max(0, Math.min(dealerIdx, numPlayers - 1));
-            const lastPlayerIndex = (adjustedDealerIndex - 1 + numPlayers) % numPlayers;
-            return players[lastPlayerIndex];
-        }
-
-        function isLastPlayer(playerName, currentState) { // Online only helper
-             return playerName === getLastPlayerName(currentState);
         }
 
         function calculateTotalBids(bids) {
@@ -2117,17 +2516,30 @@
                 .map(p => p.name);
         }
 
-        function checkElimination(currentState) {
-             // Only check active players
-             const activePlayers = currentState.players || [];
-             const scores = currentState.scores || {};
-             const currentRound = currentState.currentRound || 1; // Use current round (not next) for check
+        function checkElimination(currentState, activePlayers, nextRound) {
+             // Handle both types of calls:
+             // 1. Single param (offline mode): currentState contains all data
+             // 2. Three params (online mode): currentState=scores object, activePlayers=players array, nextRound=round number
+             
+             let players, scores, currentRound;
+             
+             if (arguments.length === 1) {
+                 // Offline mode
+                 players = currentState.players || [];
+                 scores = currentState.scores || {};
+                 currentRound = currentState.currentRound || 1;
+             } else {
+                 // Online mode
+                 scores = currentState || {};
+                 players = activePlayers || [];
+                 currentRound = nextRound || 1;
+             }
 
-             if (activePlayers.length * currentRound > ELIMINATION_THRESHOLD && activePlayers.length > 1) {
+             if (players.length * currentRound > ELIMINATION_THRESHOLD && players.length > 1) {
                  let lowestScore = Infinity;
-                 activePlayers.forEach(p => { lowestScore = Math.min(lowestScore, scores[p] || 0); });
+                 players.forEach(p => { lowestScore = Math.min(lowestScore, scores[p] || 0); });
 
-                 const lowestPlayers = activePlayers.filter(p => (scores[p] || 0) === lowestScore);
+                 const lowestPlayers = players.filter(p => (scores[p] || 0) === lowestScore);
                  if (lowestPlayers.length > 0) {
                     // Eliminate the first player found with the lowest score
                      const playerToEliminate = lowestPlayers[0];
@@ -2135,7 +2547,7 @@
                      // In offline mode, this function returns the player name to be handled by the caller
                      // In online mode, the alert happens here for simplicity, but the caller handles state update
                      if (currentMode === 'offline') {
-                         alert(`Player "${escapeHtml(playerToEliminate)}" has been eliminated! (Lowest score: ${lowestScore})`);
+                         alert(`Player "${escapeHtml(playerToEliminate)}" eliminated! (Lowest score: ${lowestScore})`);
                      }
                      return playerToEliminate;
                  }
@@ -2145,14 +2557,25 @@
 
         function checkUpcomingElimination(currentState) {
             if (!currentState || !currentState.gameStarted || currentState.currentRound > 14 || !currentState.players || currentState.players.length < 2) {
-                hideEliminationBanner(); return;
+                hideEliminationBanner(); 
+                return;
             }
+            
+            // Check if elimination will happen in any future round
+            let eliminationRound = null;
             for (let futureRound = currentState.currentRound; futureRound <= 14; futureRound++) {
                 if (currentState.players.length * futureRound > ELIMINATION_THRESHOLD) {
-                showEliminationBanner(futureRound); return;
+                    eliminationRound = futureRound;
+                    break;
                 }
             }
-            hideEliminationBanner();
+            
+            // Only update DOM if needed
+            if (eliminationRound) {
+                showEliminationBanner(eliminationRound);
+            } else {
+                hideEliminationBanner();
+            }
         }
 
         function showEliminationBanner(round) {
@@ -2160,17 +2583,22 @@
             const roundBanner = document.getElementById('round-elimination-banner');
             if (roundMessage && roundBanner) {
                 roundMessage.textContent = `Elimination at Round ${round}`;
-                roundBanner.style.display = 'flex';
+                // Always keep the element in DOM but control visibility with opacity
+                if (roundBanner.style.display === 'none') {
+                    roundBanner.style.display = 'flex';
+                }
             }
-             // Keep fixed banner hidden
+            // Keep fixed banner hidden
             const origBanner = document.getElementById('elimination-banner');
-             if (origBanner) origBanner.style.display = 'none';
+            if (origBanner) origBanner.style.display = 'none';
         }
+        
         function hideEliminationBanner() {
-             const origBanner = document.getElementById('elimination-banner');
-             if (origBanner) origBanner.style.display = 'none';
-             const roundBanner = document.getElementById('round-elimination-banner');
-             if (roundBanner) roundBanner.style.display = 'none';
+            const origBanner = document.getElementById('elimination-banner');
+            if (origBanner) origBanner.style.display = 'none';
+            
+            const roundBanner = document.getElementById('round-elimination-banner');
+            if (roundBanner) roundBanner.style.display = 'none';
         }
 
         function copyGameIdToClipboard(gameId, displayElement) {
@@ -2182,6 +2610,50 @@
                      setTimeout(() => feedbackEl.classList.remove('visible'), 1500);
                  }
              }).catch(err => { console.error('Failed to copy:', err); alert('Copy failed.'); });
+        }
+
+        function showQRCode(gameId) {
+            const qrCodeModal = document.getElementById('qr-code-modal');
+            const qrCodeContainer = document.getElementById('qr-code-container');
+            const qrCodeClose = document.getElementById('qr-code-close');
+            
+            // Clear previous QR code
+            qrCodeContainer.innerHTML = '';
+            
+            // Generate the QR code with data that will auto-fill the game ID
+            // Using URL with query parameter for better compatibility with QR scanners
+            const currentUrl = window.location.origin + window.location.pathname;
+            const qrData = `${currentUrl}?game=${encodeURIComponent(gameId)}`;
+            
+            try {
+                // Generate QR code with qrcodejs
+                new QRCode(qrCodeContainer, {
+                    text: qrData,
+                    width: 250,
+                    height: 250,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } catch (err) {
+                console.error('Failed to generate QR code:', err);
+                qrCodeContainer.innerHTML = '<p>QR code generation failed. Please try again.</p>';
+            }
+            
+            // Show modal
+            qrCodeModal.classList.add('active');
+            
+            // Add close handler
+            qrCodeClose.onclick = function() {
+                qrCodeModal.classList.remove('active');
+            };
+            
+            // Close on background click
+            qrCodeModal.onclick = function(e) {
+                if (e.target === qrCodeModal) {
+                    qrCodeModal.classList.remove('active');
+                }
+            };
         }
 
         // --- Local History Management ---
@@ -2282,6 +2754,10 @@
 
         // --- Start the App ---
         initializeApp();
+
+        function isDealer(playerName, currentState) { // Online only helper
+             return playerName === getDealerName(currentState);
+        }
 
     </script>
 </body>
