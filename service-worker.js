@@ -1,4 +1,4 @@
-const CACHE_NAME = '14-high-v1.1.2';
+const CACHE_NAME = '14-high-v2.0.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
