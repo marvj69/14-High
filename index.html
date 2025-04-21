@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>14-High! (Offline & Online)</title>
-    <meta name="description" content="Play the 14-High! card game offline with local storage or online in real-time with friends using Firebase.">
+    <meta name="description" content="Play the 14-High! card game offline with local storage or online in real-time with Firebase.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json"> <!-- Ensure manifest.json exists -->
     <link rel="apple-touch-icon" href="icons/icon-192x192.png"> <!-- Ensure icons exist -->
@@ -244,7 +244,7 @@
             border-left: 3px solid var(--primary); transition: var(--transition); font-size: 0.85rem; cursor: pointer;
         }
         .completed-game-item:hover { transform: translateX(3px); background-color: var(--light); box-shadow: var(--shadow-sm); }
-        [data-theme="dark"] .completed-game-item { background-color: var(--light); border-color: var(--primary); }
+        [data-theme="dark"] .completed-game-item { background-color: var(--gray-dark); border-color: var(--primary); }
         [data-theme="dark"] .completed-game-item:hover { background-color: var(--light-alt); }
         .completed-game-item div { margin: 0.2rem 0; display: flex; align-items: center; gap: 0.5rem; color: var(--gray); }
         .completed-game-item div i { width: 14px; text-align: center; }
@@ -341,7 +341,7 @@
             position: fixed; top: 3.5rem; right: 1rem; z-index: 950; background-color: var(--light);
             border: 1px solid var(--gray-light); border-radius: var(--radius); padding: 1rem; width: 300px;
             max-width: calc(100vw - 2rem); box-shadow: var(--shadow-md); opacity: 0; visibility: hidden;
-            transform: translateY(-10px); transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
         }
         .version-modal.active { opacity: 1; visibility: visible; transform: translateY(0); transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0s; }
         .version-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
@@ -373,8 +373,11 @@
         }
         .game-details-modal.active { opacity: 1; visibility: visible; }
         .game-details-content {
-            background-color: var(--bg-color); border-radius: var(--radius); width: 90%; max-width: 500px; max-height: 90vh;
+            background-color: var(--light); border-radius: var(--radius); width: 90%; max-width: 500px; max-height: 90vh;
             overflow-y: auto; padding: 1.5rem; position: relative; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        [data-theme="dark"] .game-details-content {
+            background-color: var(--light-alt);
         }
         .game-details-close {
             position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: var(--gray);
@@ -390,9 +393,12 @@
         }
         .qr-code-modal.active { opacity: 1; visibility: visible; }
         .qr-code-content {
-            background-color: var(--bg-color); border-radius: var(--radius); width: 90%; max-width: 350px; max-height: 90vh;
+            background-color: var(--light); border-radius: var(--radius); width: 90%; max-width: 350px; max-height: 90vh;
             overflow-y: auto; padding: 1.5rem; position: relative; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
             text-align: center;
+        }
+        [data-theme="dark"] .qr-code-content {
+            background-color: var(--light-alt);
         }
         .qr-code-close {
             position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: var(--gray);
@@ -408,6 +414,31 @@
             font-size: 0.9rem;
             color: var(--gray);
             margin-top: 1rem;
+        }
+        .qr-code-content h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        .qr-code-text {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--primary);
+            margin-top: 0.75rem;
+            word-break: break-all;
+            text-align: center;
+        }
+        #copy-qr-id-btn {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--success);
+            border: none;
+            background: none;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        #copy-qr-id-btn:hover {
+            color: var(--success-light);
         }
 
         /* Loading indicator (Online Mode) */
@@ -563,6 +594,82 @@
         [data-theme="dark"] .btn-text:hover {
             color: var(--success);
         }
+
+        /* Game Details Modal Content Styles */
+        .game-details-content h4 {
+            font-size: 1.125rem;
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+        }
+        .game-date {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .winner-names {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--light-alt);
+            padding: 0.5rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+        }
+        .winner-names .fa-crown {
+            margin-right: 0.5rem;
+            color: var(--warning);
+        }
+        .player-scores-container {
+            margin-top: 1rem;
+        }
+        .player-scores-header {
+            display: flex;
+            font-weight: 600;
+            color: var(--dark-alt);
+            border-bottom: 1px solid var(--gray-light);
+            padding: 0.5rem 0;
+        }
+        .player-scores-header span {
+            flex: 1;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+        .player-score-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        .player-score-item:last-child {
+            border-bottom: none;
+        }
+        .player-score-item span {
+            flex: 1;
+        }
+        .player-score-value {
+            font-weight: 600;
+            color: var(--primary);
+            text-align: right;
+        }
+        .player-score-item.winner {
+            background-color: rgba(34, 197, 94, 0.1);
+        }
+        .player-score-item.eliminated {
+            opacity: 0.6;
+        }
+        [data-theme="dark"] .player-scores-header {
+            border-color: var(--gray-dark);
+            color: var(--gray);
+        }
+        [data-theme="dark"] .player-score-item {
+            border-color: var(--gray-dark);
+        }
+        [data-theme="dark"] .player-score-item.winner {
+            background-color: rgba(74, 222, 128, 0.1);
+        }
     </style>
     <!-- QR Code library (changed to CDN version) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -582,6 +689,8 @@
         <button id="qr-code-close" class="qr-code-close" aria-label="Close QR code"><i class="fas fa-times"></i></button>
         <h3><i class="fas fa-qrcode"></i> Game QR Code</h3>
         <div class="qr-code-container" id="qr-code-container"></div>
+        <div class="qr-code-text" id="qr-code-text"></div>
+        <button id="copy-qr-id-btn" class="btn-text">Copy Game ID</button>
         <div class="qr-code-instructions">
           Other players can scan this QR code with their phone to automatically join your game
         </div>
@@ -637,7 +746,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.0.1</span> <!-- Updated Version -->
+        <span>v2.0.2</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -647,7 +756,7 @@
             </button>
         </div>
         <div class="version-info">
-            <p><strong>Released:</strong> [Current Date]</p>
+            <p><strong>Released:</strong> April 2025</p>
             <p><strong>What's New:</strong></p>
             <ul>
                 <li><i class="fas fa-compress-alt"></i> **Combined App:** Single page for Offline & Online play!</li>
@@ -656,6 +765,9 @@
                 <li><i class="fas fa-hdd"></i> Offline mode uses Local Storage.</li>
                 <li><i class="fas fa-cloud"></i> Online mode uses Firebase for real-time multiplayer.</li>
                 <li>Includes features from both previous versions (history, dark mode, game IDs, etc.).</li>
+                <li>Author: Mark Heinonen</li>
+                <li>(906) 299-2350</li>
+
             </ul>
         </div>
     </div>
@@ -793,6 +905,9 @@
                     }
                 });
             }
+            
+            // Bind common UI event handlers (version badge, escape key, modal clicks)
+            setupCommonEventListeners();
         }
 
         function setupCommonEventListeners() {
@@ -1478,7 +1593,7 @@
                     <h3><i class="fas fa-link"></i> Join Existing Game</h3>
                      <div class="input-group">
                         <div class="input-with-button">
-                            <input type="text" id="join-game-id-input" placeholder="Enter Game ID" aria-label="Game ID to join">
+                            <input type="text" id="join-game-id-input" placeholder="Enter Game ID" aria-label="Game ID to join" oninput="this.value = this.value.toUpperCase()">
                             <button class="btn-add" id="join-game-btn"><i class="fas fa-sign-in-alt"></i> Join</button>
                         </div>
                      </div>
@@ -1608,7 +1723,6 @@
                         <span id="round-elimination-message">Upcoming elimination</span>
                         </div>
                     </div>
-                    </div>
 
                     ${bidPhase ? bidInfoHtml : tricksInfoHtml}
 
@@ -1700,7 +1814,7 @@
             }
 
             // --- Scoreboard (Common for both modes) ---
-             const allPlayersForScoreboard = [...new Set([...players, ...eliminatedPlayers])];
+             const allPlayersForScoreboard = [...new Set([...(currentState.players || []), ...(currentState.eliminatedPlayers || [])])];
              const sortedPlayers = getSortedPlayers(scores, allPlayersForScoreboard);
 
             gameplayHtml += `
@@ -1977,7 +2091,17 @@
 
         // --- Online Mode Logic ---
 
-        function createOnlineGame() {
+        // Add function to generate short alphanumeric game IDs
+        function generateRandomId(length = 6) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let id = '';
+            for (let i = 0; i < length; i++) {
+                id += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return id;
+        }
+
+        async function createOnlineGame() {
             if (!firebaseConnected) { alert("Not connected to Firebase."); return; }
             setLoading(true, "Creating game...");
 
@@ -1987,8 +2111,14 @@
                 createdAt: firebase.database.ServerValue.TIMESTAMP
             };
 
-            const newGameRef = firebase.database().ref('games').push(); // Use push for unique ID
-            const newGameId = newGameRef.key;
+            // Generate a unique short game ID
+            const db = firebase.database();
+            let newGameId, snapshot;
+            do {
+                newGameId = generateRandomId(6);
+                snapshot = await db.ref(`games/${newGameId}`).once('value');
+            } while (snapshot.exists());
+            const newGameRef = db.ref(`games/${newGameId}`);
 
             newGameRef.set(initialGameState)
                 .then(() => {
@@ -2077,7 +2207,7 @@
             if (!gameId) { console.error("Attach listener: No game ID."); return; }
 
             console.log(`Attaching listener to game: ${gameId}`);
-            gameRef = firebase.database().ref(`games/${gameId}`);
+            gameRef = firebase.database().ref('games').child(gameId);
             setLoading(true, 'Loading game data...');
 
             gameListenerHandle = gameRef.on('value', (snapshot) => {
