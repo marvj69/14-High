@@ -2620,10 +2620,9 @@
             // Clear previous QR code
             qrCodeContainer.innerHTML = '';
             
-            // Generate the QR code with data that will auto-fill the game ID
-            // Using URL with query parameter for better compatibility with QR scanners
-            const currentUrl = window.location.origin + window.location.pathname;
-            const qrData = `${currentUrl}?game=${encodeURIComponent(gameId)}`;
+            // Generate a QR code with just the game ID as plain text
+            // This will allow the user to easily copy it after scanning
+            const qrData = gameId;
             
             try {
                 // Generate QR code with qrcodejs
@@ -2635,6 +2634,62 @@
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.H
                 });
+                
+                // Add game ID display and copy button below QR code
+                const infoContainer = document.createElement('div');
+                infoContainer.style.marginTop = '1rem';
+                infoContainer.style.textAlign = 'center';
+                
+                // Game ID display
+                const gameIdDisplay = document.createElement('div');
+                gameIdDisplay.style.fontFamily = 'monospace';
+                gameIdDisplay.style.padding = '0.5rem';
+                gameIdDisplay.style.backgroundColor = 'var(--light-alt)';
+                gameIdDisplay.style.border = '1px solid var(--gray-light)';
+                gameIdDisplay.style.borderRadius = 'var(--radius)';
+                gameIdDisplay.style.marginBottom = '0.5rem';
+                gameIdDisplay.style.wordBreak = 'break-all';
+                gameIdDisplay.textContent = gameId;
+                
+                // Copy button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn-small';
+                copyBtn.innerHTML = '<i class="far fa-copy"></i> Copy Game ID';
+                copyBtn.style.margin = '0 auto';
+                
+                // Feedback element
+                const feedbackEl = document.createElement('span');
+                feedbackEl.className = 'copy-feedback';
+                feedbackEl.id = `qr-copy-feedback-${gameId}`;
+                feedbackEl.textContent = 'Copied!';
+                feedbackEl.style.display = 'block';
+                feedbackEl.style.marginTop = '0.5rem';
+                
+                // Add click handler for copy button
+                copyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(gameId).then(() => {
+                        feedbackEl.classList.add('visible');
+                        setTimeout(() => feedbackEl.classList.remove('visible'), 1500);
+                    }).catch(err => {
+                        console.error('Failed to copy:', err);
+                        alert('Copy failed.');
+                    });
+                });
+                
+                // Append elements
+                infoContainer.appendChild(gameIdDisplay);
+                infoContainer.appendChild(copyBtn);
+                infoContainer.appendChild(feedbackEl);
+                qrCodeContainer.appendChild(infoContainer);
+                
+                // Update instructions
+                const instructionsDiv = document.querySelector('.qr-code-instructions');
+                if (instructionsDiv) {
+                    instructionsDiv.innerHTML = `
+                        Scan this QR code with your phone's camera or QR scanner app,<br>
+                        or copy the game ID manually to join the game.
+                    `;
+                }
             } catch (err) {
                 console.error('Failed to generate QR code:', err);
                 qrCodeContainer.innerHTML = '<p>QR code generation failed. Please try again.</p>';
