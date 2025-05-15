@@ -152,9 +152,30 @@
         .player-item span { font-weight: 500; }
         [data-theme="dark"] .player-item { background-color: var(--light); border-color: var(--gray-dark); }
         .btn-remove {
-            background: none; color: var(--danger); padding: 0.25rem; border-radius: 50%;
-            width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-        }
+  background: none; color: var(--danger); padding: 0.25rem; border-radius: 50%;
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-move-up, .btn-move-down {
+  background: none;
+  color: var(--primary);
+  padding: 0.25rem;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: background 0.15s;
+}
+.btn-move-up:disabled, .btn-move-down:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-move-up:hover:not(:disabled), .btn-move-down:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--success);
+}
         .btn-remove:hover { background: rgba(239, 68, 68, 0.1); color: var(--danger-hover); transform: none; box-shadow: none; }
 
         /* Tables */
@@ -673,6 +694,8 @@
     </style>
     <!-- QR Code library (changed to CDN version) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Add html5-qrcode for QR scanning -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body data-theme="light">
     <!-- Game Details Modal -->
@@ -694,6 +717,29 @@
         <div class="qr-code-instructions">
           Other players can scan this QR code with their phone to automatically join your game
         </div>
+      </div>
+    </div>
+
+    <!-- Hand-off QR Export Modal (for offline game state) -->
+    <div id="handoff-qr-modal" class="qr-code-modal">
+      <div class="qr-code-content">
+        <button id="handoff-qr-close" class="qr-code-close" aria-label="Close hand-off QR"><i class="fas fa-times"></i></button>
+        <h3><i class="fas fa-qrcode"></i> Hand-off Game (QR)</h3>
+        <div class="qr-code-container" id="handoff-qr-container"></div>
+        <div class="qr-code-instructions">
+          Scan this QR code on another device to continue your offline game.<br>
+          <span style="font-size:0.85em;color:var(--gray);">(Large games may take a few seconds to scan.)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hand-off QR Import Modal (for scanning QR) -->
+    <div id="handoff-import-modal" class="qr-code-modal">
+      <div class="qr-code-content" style="max-width:400px;">
+        <button id="handoff-import-close" class="qr-code-close" aria-label="Close import QR"><i class="fas fa-times"></i></button>
+        <h3><i class="fas fa-qrcode"></i> Import Game from QR</h3>
+        <div id="handoff-qr-reader" style="width:100%;margin:0 auto;"></div>
+        <div id="handoff-import-status" style="margin-top:1rem;color:var(--gray);"></div>
       </div>
     </div>
 
@@ -746,7 +792,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.0.2</span> <!-- Updated Version -->
+        <span>v2.1.0</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -908,6 +954,18 @@
             
             // Bind common UI event handlers (version badge, escape key, modal clicks)
             setupCommonEventListeners();
+
+            // Hand-off QR event listeners
+            document.body.addEventListener('click', function(e) {
+                // Export (Hand-off via QR)
+                if (e.target.closest('#handoff-qr-btn')) {
+                    showHandoffQRModal();
+                }
+                // Import (Scan QR)
+                if (e.target.closest('#handoff-import-btn')) {
+                    showHandoffImportModal();
+                }
+            });
         }
 
         function setupCommonEventListeners() {
@@ -1094,12 +1152,57 @@
                         if (player) currentMode === 'offline' ? removePlayerOffline(player) : removePlayerOnline(player);
                         return;
                     }
+                    const moveUpBtn = target.closest('.btn-move-up');
+                    if (moveUpBtn) {
+                        const player = moveUpBtn.getAttribute('data-player');
+                        if (player) {
+                            if (currentMode === 'offline') {
+                                const idx = offlineState.players.indexOf(player);
+                                if (idx > 0) {
+                                    [offlineState.players[idx - 1], offlineState.players[idx]] = [offlineState.players[idx], offlineState.players[idx - 1]];
+                                    saveOfflineState();
+                                    renderApp();
+                                }
+                            } else {
+                                // Online: update Firebase
+                                const idx = onlineState.players.indexOf(player);
+                                if (idx > 0) {
+                                    const newPlayers = [...onlineState.players];
+                                    [newPlayers[idx - 1], newPlayers[idx]] = [newPlayers[idx], newPlayers[idx - 1]];
+                                    gameRef.update({ '/players': newPlayers });
+                                }
+                            }
+                        }
+                        return;
+                    }
+                    const moveDownBtn = target.closest('.btn-move-down');
+                    if (moveDownBtn) {
+                        const player = moveDownBtn.getAttribute('data-player');
+                        if (player) {
+                            if (currentMode === 'offline') {
+                                const idx = offlineState.players.indexOf(player);
+                                if (idx !== -1 && idx < offlineState.players.length - 1) {
+                                    [offlineState.players[idx + 1], offlineState.players[idx]] = [offlineState.players[idx], offlineState.players[idx + 1]];
+                                    saveOfflineState();
+                                    renderApp();
+                                }
+                            } else {
+                                // Online: update Firebase
+                                const idx = onlineState.players.indexOf(player);
+                                if (idx !== -1 && idx < onlineState.players.length - 1) {
+                                    const newPlayers = [...onlineState.players];
+                                    [newPlayers[idx + 1], newPlayers[idx]] = [newPlayers[idx], newPlayers[idx + 1]];
+                                    gameRef.update({ '/players': newPlayers });
+                                }
+                            }
+                        }
+                        return;
+                    }
                     if (target.closest('#start-game-btn')) {
                         currentMode === 'offline' ? startGameOffline() : startGameOnline();
                         return;
                     }
                 }
-
                 // Gameplay Actions (only if game started)
                 if (currentState.gameStarted) {
                     if (target.closest('#submit-bids-btn')) {
@@ -1491,8 +1594,8 @@
             const state = (currentMode === 'offline') ? offlineState : onlineState;
             if (!state || !state.gameStarted || state.currentRound > 14) return; // Only run if in a started game
 
-            const totalBids = calculateTotalBids(state.bids);
-            const totalTricks = calculateTotalTricks(state.tricks);
+            const totalBids = calculateTotalBids(state.bids, state.players);
+            const totalTricks = calculateTotalTricks(state.tricks, state.players);
             const dealerName = (currentMode === 'online-game') ? getDealerName(state) : null; // Only relevant online
             const dealerBid = (dealerName && state.bids && state.bids[dealerName] !== undefined && state.bids[dealerName] !== null) ? state.bids[dealerName] : undefined;
             const players = state.players || [];
@@ -1562,6 +1665,7 @@
                         <h3><i class="fas fa-user-friends"></i> Play Offline</h3>
                         <p>Play solo or pass the device around. Game progress is saved locally in your browser.</p>
                         <button id="select-offline-btn" class="btn-full">${offlineButtonText}</button>
+                        <button id="handoff-import-btn" class="btn-small" style="margin-top:0.5rem;"><i class="fas fa-qrcode"></i> Import from QR</button>
                     </div>
                     <div class="card">
                         <h3><i class="fas fa-globe-americas"></i> Play Online</h3>
@@ -1652,14 +1756,22 @@
                      <div>
                        <h3><i class="fas fa-list-ul"></i> Current Players (${players.length})</h3>
                        <div class="player-list">
-                         ${players.map(player => `
-                           <div class="player-item">
-                             <span>${escapeHtml(player)}</span>
-                             <button class="btn-remove" data-player="${escapeHtml(player)}" aria-label="Remove ${escapeHtml(player)}">
-                                 <i class="fas fa-times"></i>
-                             </button>
-                           </div>
-                         `).join('')}
+                         ${players.map((player, idx) => `
+  <div class="player-item">
+    <span>${escapeHtml(player)}</span>
+    <div style="display: flex; gap: 0.25rem; align-items: center;">
+      <button class="btn-move-up" data-player="${escapeHtml(player)}" ${idx === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(player)} up" tabindex="0" title="Move up">
+        <i class="fas fa-arrow-up"></i>
+      </button>
+      <button class="btn-move-down" data-player="${escapeHtml(player)}" ${idx === players.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(player)} down" tabindex="0" title="Move down">
+        <i class="fas fa-arrow-down"></i>
+      </button>
+      <button class="btn-remove" data-player="${escapeHtml(player)}" aria-label="Remove ${escapeHtml(player)}">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+`).join('')}
                        </div>
                      </div>
                    ` : '<p style="text-align: center; color: var(--gray); font-size: 0.9rem; margin: 1.5rem 0;">No players added yet. Add 2 or more to start.</p>'}
@@ -1677,6 +1789,7 @@
 
                    <div class="button-group" style="margin-top: 1.5rem; justify-content: center;">
                        <button id="back-to-menu-btn" class="btn-outline"><i class="fas fa-arrow-left"></i> Back to Mode Select</button>
+                       ${!isOnline ? `<button id="handoff-import-btn" class="btn-small"><i class="fas fa-qrcode"></i> Import from QR</button>` : ''}
                    </div>
                 </div>
              `;
@@ -1852,6 +1965,7 @@
                          <button id="leave-game-btn" class="btn-leave-game"><i class="fas fa-sign-out-alt"></i> Leave</button>
                          <button id="reset-game-btn" class="btn-red"><i class="fas fa-power-off"></i> Reset Game</button>
                          ${isOnline && currentGameId ? `<button id="show-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i></button>` : ''}
+                         ${!isOnline ? `<button id="handoff-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i> Hand-off via QR</button>` : ''}
                     </div>
                     <p>Round ${currentRound} / 14</p>
                     </div>
@@ -2472,9 +2586,12 @@
                 if (onlineState.bids[p] !== undefined) resetBids[p] = onlineState.bids[p];
                 if (onlineState.tricks[p] !== undefined) resetTricks[p] = onlineState.tricks[p];
             });
-            // Preserve bids/tricks of newly eliminated player
-            if (newEliminatedPlayer && onlineState.bids[newEliminatedPlayer] !== undefined) resetBids[newEliminatedPlayer] = onlineState.bids[newEliminatedPlayer];
-            if (newEliminatedPlayer && onlineState.tricks[newEliminatedPlayer] !== undefined) resetTricks[newEliminatedPlayer] = onlineState.tricks[newEliminatedPlayer];
+            // Preserve bids/tricks of newly eliminated player for history, but REMOVE from next round logic
+            if (newEliminatedPlayer) {
+                // Remove from next round's bids/tricks
+                delete resetBids[newEliminatedPlayer];
+                delete resetTricks[newEliminatedPlayer];
+            }
 
             updates['/bids'] = resetBids;
             updates['/tricks'] = resetTricks;
@@ -2575,19 +2692,25 @@
             return players[adjustedIndex];
         }
 
-        function calculateTotalBids(bids) {
-            return Object.values(bids || {}).reduce((sum, bid) => sum + (bid === null || bid === undefined ? 0 : Number(bid) || 0), 0);
+        function calculateTotalBids(bids, players) {
+            return (players || []).reduce((sum, p) => {
+                const bid = bids && bids[p];
+                return sum + (bid === null || bid === undefined ? 0 : Number(bid) || 0);
+            }, 0);
         }
 
-        function calculateTotalTricks(tricks) {
-             return Object.values(tricks || {}).reduce((sum, trick) => sum + (trick === null || trick === undefined ? 0 : Number(trick) || 0), 0);
+        function calculateTotalTricks(tricks, players) {
+            return (players || []).reduce((sum, p) => {
+                const trick = tricks && tricks[p];
+                return sum + (trick === null || trick === undefined ? 0 : Number(trick) || 0);
+            }, 0);
         }
 
-         function calculatePotentialBidTotal(playerMakingBid, bidValue, currentState) { // Online helper
+        function calculatePotentialBidTotal(playerMakingBid, bidValue, currentState) { // Online helper
             const potentialBids = { ...(currentState.bids || {}) };
             potentialBids[playerMakingBid] = bidValue ?? 0; // Treat null/undefined as 0
-            return calculateTotalBids(potentialBids);
-         }
+            return calculateTotalBids(potentialBids, currentState.players);
+        }
 
         function allPlayersHaveBid(currentState) {
             const players = currentState.players || [];
@@ -2605,7 +2728,7 @@
             const players = currentState.players || [];
             if (!currentState.gameStarted || !currentState.bidPhase || players.length === 0) return false;
             if (!allPlayersHaveBid(currentState)) return false;
-            const totalBids = calculateTotalBids(currentState.bids);
+            const totalBids = calculateTotalBids(currentState.bids, players);
             return totalBids !== currentState.currentRound;
         }
 
@@ -2618,7 +2741,7 @@
         function validateTricksTotal(currentState) {
             const players = currentState.players || [];
             if (!currentState.gameStarted || currentState.bidPhase || players.length === 0) return false;
-            const totalTricks = calculateTotalTricks(currentState.tricks);
+            const totalTricks = calculateTotalTricks(currentState.tricks, players);
             return totalTricks === currentState.currentRound;
         }
 
@@ -2942,6 +3065,106 @@
 
         function isDealer(playerName, currentState) { // Online only helper
              return playerName === getDealerName(currentState);
+        }
+
+        // --- Hand-off QR Export/Import Logic ---
+        function showHandoffQRModal() {
+            const modal = document.getElementById('handoff-qr-modal');
+            const container = document.getElementById('handoff-qr-container');
+            const closeBtn = document.getElementById('handoff-qr-close');
+            if (!modal || !container) return;
+            container.innerHTML = '';
+            // Get offline game state
+            let stateStr = localStorage.getItem(LOCAL_STORAGE_OFFLINE_KEY);
+            if (!stateStr) {
+                container.innerHTML = '<p style="color:var(--danger);">No offline game to export.</p>';
+                modal.classList.add('active');
+                return;
+            }
+            // Optionally add a prefix for identification
+            const qrData = '14HIGH:' + stateStr;
+            try {
+                new QRCode(container, {
+                    text: qrData,
+                    width: 250,
+                    height: 250,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } catch (err) {
+                container.innerHTML = '<p>QR code generation failed.</p>';
+            }
+            modal.classList.add('active');
+            closeBtn.onclick = () => modal.classList.remove('active');
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('active'); };
+        }
+
+        function showHandoffImportModal() {
+            const modal = document.getElementById('handoff-import-modal');
+            const closeBtn = document.getElementById('handoff-import-close');
+            const statusEl = document.getElementById('handoff-import-status');
+            const qrReaderDiv = document.getElementById('handoff-qr-reader');
+            if (!modal || !qrReaderDiv) return;
+            statusEl.textContent = '';
+            qrReaderDiv.innerHTML = '';
+            modal.classList.add('active');
+            let html5QrCode;
+            // Start QR scanner
+            setTimeout(() => {
+                html5QrCode = new Html5Qrcode("handoff-qr-reader");
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: 250 },
+                    (decodedText, decodedResult) => {
+                        // Only accept if starts with our prefix
+                        if (decodedText.startsWith('14HIGH:')) {
+                            try {
+                                const jsonStr = decodedText.slice(7);
+                                const parsed = JSON.parse(jsonStr);
+                                // Basic validation: must have players and gameStarted
+                                if (parsed && Array.isArray(parsed.players) && typeof parsed.gameStarted === 'boolean') {
+                                    localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, jsonStr);
+                                    statusEl.style.color = 'var(--success)';
+                                    statusEl.textContent = 'Game imported! Reloading...';
+                                    html5QrCode.stop().then(() => {
+                                        setTimeout(() => {
+                                            modal.classList.remove('active');
+                                            selectMode('offline');
+                                        }, 800);
+                                    });
+                                } else {
+                                    statusEl.style.color = 'var(--danger)';
+                                    statusEl.textContent = 'Invalid game data.';
+                                }
+                            } catch (err) {
+                                statusEl.style.color = 'var(--danger)';
+                                statusEl.textContent = 'Failed to parse game data.';
+                            }
+                        } else {
+                            statusEl.style.color = 'var(--danger)';
+                            statusEl.textContent = 'Unrecognized QR code.';
+                        }
+                    },
+                    (errorMessage) => {
+                        // Ignore scan errors
+                    }
+                ).catch(err => {
+                    statusEl.style.color = 'var(--danger)';
+                    statusEl.textContent = 'Camera error: ' + err;
+                });
+            }, 100);
+            // Close logic
+            closeBtn.onclick = () => {
+                modal.classList.remove('active');
+                if (html5QrCode) html5QrCode.stop().catch(()=>{});
+            };
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    if (html5QrCode) html5QrCode.stop().catch(()=>{});
+                }
+            };
         }
 
     </script>
