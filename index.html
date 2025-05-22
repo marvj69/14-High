@@ -727,17 +727,20 @@
         <h3><i class="fas fa-qrcode"></i> Hand-off Game (QR)</h3>
         <div class="qr-code-container" id="handoff-qr-container"></div>
         <div class="qr-code-instructions">
-          Scan this QR code on another device to continue your offline game.<br>
-          <span style="font-size:0.85em;color:var(--gray);">(Large games may take a few seconds to scan.)</span>
+          Transfer your offline game to another device by scanning this QR code.<br>
+          <span style="font-size:0.85em;color:var(--gray);">Game state is compressed to fit in QR code - round history may be lost.</span>
         </div>
       </div>
     </div>
 
     <!-- Hand-off QR Import Modal (for scanning QR) -->
     <div id="handoff-import-modal" class="qr-code-modal">
-      <div class="qr-code-content" style="max-width:400px;">
+      <div class="qr-code-content" style="max-width:450px;">
         <button id="handoff-import-close" class="qr-code-close" aria-label="Close import QR"><i class="fas fa-times"></i></button>
         <h3><i class="fas fa-qrcode"></i> Import Game from QR</h3>
+        <div style="font-size: 0.9rem; color: var(--gray); margin-bottom: 1rem; text-align: center;">
+          Scan a hand-off QR code from another device or paste game data manually below.
+        </div>
         <div id="handoff-qr-reader" style="width:100%;margin:0 auto;"></div>
         <div id="handoff-import-status" style="margin-top:1rem;color:var(--gray);"></div>
       </div>
@@ -3074,6 +3077,7 @@
             const closeBtn = document.getElementById('handoff-qr-close');
             if (!modal || !container) return;
             container.innerHTML = '';
+            
             // Get offline game state
             let stateStr = localStorage.getItem(LOCAL_STORAGE_OFFLINE_KEY);
             if (!stateStr) {
@@ -3081,20 +3085,96 @@
                 modal.classList.add('active');
                 return;
             }
-            // Optionally add a prefix for identification
-            const qrData = '14HIGH:' + stateStr;
+            
             try {
+                // Parse and compress the game state for QR export
+                const fullState = JSON.parse(stateStr);
+                
+                // Create a minimal state for hand-off (remove unnecessary data)
+                const minimalState = {
+                    players: fullState.players || [],
+                    gameStarted: fullState.gameStarted || false,
+                    currentRound: fullState.currentRound || 1,
+                    bids: fullState.bids || {},
+                    tricks: fullState.tricks || {},
+                    scores: fullState.scores || {},
+                    bidPhase: fullState.bidPhase !== false, // default true
+                    eliminatedPlayers: fullState.eliminatedPlayers || []
+                    // Note: We're excluding roundHistory to save space
+                };
+                
+                const minimalStateStr = JSON.stringify(minimalState);
+                const qrData = '14HIGH:' + minimalStateStr;
+                
+                // Check size before generating QR
+                const dataSize = new Blob([qrData]).size;
+                console.log(`QR data size: ${dataSize} bytes`);
+                
+                if (dataSize > 2900) { // Conservative limit
+                    container.innerHTML = `
+                        <div style="text-align: center; color: var(--danger); padding: 1rem;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                            <p><strong>Game data too large for QR code</strong></p>
+                            <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+                                Data size: ${dataSize} bytes (limit: ~2900 bytes)<br>
+                                Try reducing player names or start a new game.
+                            </p>
+                            <button onclick="copyGameDataToClipboard()" style="margin-top: 1rem;" class="btn-small">
+                                <i class="fas fa-copy"></i> Copy Game Data Instead
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Add the copy function to window for the button
+                    window.copyGameDataToClipboard = function() {
+                        navigator.clipboard.writeText(qrData).then(() => {
+                            alert('Game data copied to clipboard! Share this text with the other player.');
+                        }).catch(err => {
+                            console.error('Copy failed:', err);
+                            alert('Copy failed. Please try selecting and copying the data manually.');
+                        });
+                    };
+                    
+                    modal.classList.add('active');
+                    return;
+                }
+                
+                // Generate QR code with lower error correction for more data capacity
                 new QRCode(container, {
                     text: qrData,
                     width: 250,
                     height: 250,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
+                    correctLevel: QRCode.CorrectLevel.L // Lower error correction = more data capacity
                 });
+                
+                // Add data size info below QR code
+                const infoDiv = document.createElement('div');
+                infoDiv.style.marginTop = '1rem';
+                infoDiv.style.fontSize = '0.8rem';
+                infoDiv.style.color = 'var(--gray)';
+                infoDiv.style.textAlign = 'center';
+                infoDiv.innerHTML = `
+                    Data size: ${dataSize} bytes<br>
+                    <span style="color: var(--success);">✓ QR code generated successfully</span>
+                `;
+                container.appendChild(infoDiv);
+                
             } catch (err) {
-                container.innerHTML = '<p>QR code generation failed.</p>';
+                console.error('QR generation error:', err);
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--danger); padding: 1rem;">
+                        <i class="fas fa-times-circle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                        <p><strong>QR code generation failed</strong></p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+                            Error: ${err.message || 'Unknown error'}<br>
+                            Please try again or start a new game.
+                        </p>
+                    </div>
+                `;
             }
+            
             modal.classList.add('active');
             closeBtn.onclick = () => modal.classList.remove('active');
             modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('active'); };
@@ -3106,63 +3186,146 @@
             const statusEl = document.getElementById('handoff-import-status');
             const qrReaderDiv = document.getElementById('handoff-qr-reader');
             if (!modal || !qrReaderDiv) return;
-            statusEl.textContent = '';
+            statusEl.textContent = 'Position the QR code in the frame...';
+            statusEl.style.color = 'var(--gray)';
             qrReaderDiv.innerHTML = '';
             modal.classList.add('active');
             let html5QrCode;
+            
+            // Add text input option as fallback
+            const textInputDiv = document.createElement('div');
+            textInputDiv.style.marginTop = '1rem';
+            textInputDiv.style.padding = '1rem';
+            textInputDiv.style.border = '1px solid var(--gray-light)';
+            textInputDiv.style.borderRadius = 'var(--radius)';
+            textInputDiv.innerHTML = `
+                <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">Or paste game data manually:</h4>
+                <textarea id="manual-import-data" placeholder="Paste game data here..." style="width: 100%; height: 80px; font-family: monospace; font-size: 0.8rem; padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: var(--radius); resize: vertical;"></textarea>
+                <button onclick="importManualData()" style="margin-top: 0.5rem;" class="btn-small">
+                    <i class="fas fa-upload"></i> Import Data
+                </button>
+            `;
+            
+            // Add manual import function
+            window.importManualData = function() {
+                const textarea = document.getElementById('manual-import-data');
+                const data = textarea.value.trim();
+                if (data) {
+                    processImportData(data, statusEl, html5QrCode, modal);
+                } else {
+                    statusEl.style.color = 'var(--danger)';
+                    statusEl.textContent = 'Please paste game data first.';
+                }
+            };
+            
+            // Function to process import data (both QR and manual)
+            function processImportData(decodedText, statusEl, html5QrCode, modal) {
+                if (decodedText.startsWith('14HIGH:')) {
+                    try {
+                        const jsonStr = decodedText.slice(7);
+                        const parsed = JSON.parse(jsonStr);
+                        
+                        // Enhanced validation
+                        if (parsed && 
+                            Array.isArray(parsed.players) && 
+                            typeof parsed.gameStarted === 'boolean' &&
+                            typeof parsed.currentRound === 'number' &&
+                            parsed.scores && typeof parsed.scores === 'object') {
+                            
+                            // Restore full game state with defaults for missing data
+                            const fullState = {
+                                players: parsed.players,
+                                gameStarted: parsed.gameStarted,
+                                currentRound: parsed.currentRound,
+                                bids: parsed.bids || {},
+                                tricks: parsed.tricks || {},
+                                scores: parsed.scores || {},
+                                bidPhase: parsed.bidPhase !== false, // default true
+                                eliminatedPlayers: parsed.eliminatedPlayers || [],
+                                roundHistory: [] // Reset history since we didn't transfer it
+                            };
+                            
+                            localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, JSON.stringify(fullState));
+                            statusEl.style.color = 'var(--success)';
+                            statusEl.textContent = `Game imported! Found ${parsed.players.length} players, Round ${parsed.currentRound}. Loading...`;
+                            
+                            const closeAndLoad = () => {
+                                setTimeout(() => {
+                                    modal.classList.remove('active');
+                                    selectMode('offline');
+                                }, 800);
+                            };
+                            
+                            if (html5QrCode) {
+                                html5QrCode.stop().then(closeAndLoad).catch(closeAndLoad);
+                            } else {
+                                closeAndLoad();
+                            }
+                        } else {
+                            statusEl.style.color = 'var(--danger)';
+                            statusEl.textContent = 'Invalid game data format. Missing required fields.';
+                            console.error('Invalid game data:', parsed);
+                        }
+                    } catch (err) {
+                        statusEl.style.color = 'var(--danger)';
+                        statusEl.textContent = 'Failed to parse game data: ' + err.message;
+                        console.error('Parse error:', err);
+                    }
+                } else {
+                    statusEl.style.color = 'var(--danger)';
+                    statusEl.textContent = 'Not a 14-High! game QR code.';
+                }
+            }
+            
             // Start QR scanner
             setTimeout(() => {
+                if (typeof Html5Qrcode === 'undefined') {
+                    statusEl.style.color = 'var(--danger)';
+                    statusEl.textContent = 'QR scanner not available. Please use manual import below.';
+                    document.getElementById('handoff-qr-reader').appendChild(textInputDiv);
+                    return;
+                }
+                
                 html5QrCode = new Html5Qrcode("handoff-qr-reader");
                 html5QrCode.start(
                     { facingMode: "environment" },
                     { fps: 10, qrbox: 250 },
                     (decodedText, decodedResult) => {
-                        // Only accept if starts with our prefix
-                        if (decodedText.startsWith('14HIGH:')) {
-                            try {
-                                const jsonStr = decodedText.slice(7);
-                                const parsed = JSON.parse(jsonStr);
-                                // Basic validation: must have players and gameStarted
-                                if (parsed && Array.isArray(parsed.players) && typeof parsed.gameStarted === 'boolean') {
-                                    localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, jsonStr);
-                                    statusEl.style.color = 'var(--success)';
-                                    statusEl.textContent = 'Game imported! Reloading...';
-                                    html5QrCode.stop().then(() => {
-                                        setTimeout(() => {
-                                            modal.classList.remove('active');
-                                            selectMode('offline');
-                                        }, 800);
-                                    });
-                                } else {
-                                    statusEl.style.color = 'var(--danger)';
-                                    statusEl.textContent = 'Invalid game data.';
-                                }
-                            } catch (err) {
-                                statusEl.style.color = 'var(--danger)';
-                                statusEl.textContent = 'Failed to parse game data.';
-                            }
-                        } else {
-                            statusEl.style.color = 'var(--danger)';
-                            statusEl.textContent = 'Unrecognized QR code.';
-                        }
+                        processImportData(decodedText, statusEl, html5QrCode, modal);
                     },
                     (errorMessage) => {
-                        // Ignore scan errors
+                        // Ignore frequent scan errors, but show camera issues
+                        if (errorMessage.includes('Camera') || errorMessage.includes('Permission')) {
+                            statusEl.style.color = 'var(--warning)';
+                            statusEl.textContent = 'Camera issue: ' + errorMessage;
+                        }
                     }
                 ).catch(err => {
                     statusEl.style.color = 'var(--danger)';
-                    statusEl.textContent = 'Camera error: ' + err;
+                    statusEl.textContent = 'Camera error: ' + err.message;
+                    console.error('Camera error:', err);
+                    // Show manual input as fallback
+                    document.getElementById('handoff-qr-reader').appendChild(textInputDiv);
                 });
+                
+                // Add manual input option below camera
+                setTimeout(() => {
+                    document.getElementById('handoff-qr-reader').appendChild(textInputDiv);
+                }, 500);
             }, 100);
+            
             // Close logic
             closeBtn.onclick = () => {
                 modal.classList.remove('active');
                 if (html5QrCode) html5QrCode.stop().catch(()=>{});
+                // Clean up global functions
+                delete window.importManualData;
             };
             modal.onclick = (e) => {
                 if (e.target === modal) {
                     modal.classList.remove('active');
                     if (html5QrCode) html5QrCode.stop().catch(()=>{});
+                    delete window.importManualData;
                 }
             };
         }
