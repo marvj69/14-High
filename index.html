@@ -696,6 +696,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <!-- Add html5-qrcode for QR scanning -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 </head>
 <body data-theme="light">
     <!-- Game Details Modal -->
@@ -3104,7 +3105,10 @@
                 };
                 
                 const minimalStateStr = JSON.stringify(minimalState);
-                const qrData = '14HIGH:' + minimalStateStr;
+                // --- COMPRESSION ADDED HERE ---
+                const compressed = LZString.compressToEncodedURIComponent(minimalStateStr);
+                const qrData = '14HIGHZ:' + compressed;
+                // --- END COMPRESSION ---
                 
                 // Check size before generating QR
                 const dataSize = new Blob([qrData]).size;
@@ -3220,9 +3224,10 @@
             
             // Function to process import data (both QR and manual)
             function processImportData(decodedText, statusEl, html5QrCode, modal) {
-                if (decodedText.startsWith('14HIGH:')) {
+                if (decodedText.startsWith('14HIGHZ:')) {
                     try {
-                        const jsonStr = decodedText.slice(7);
+                        const compressed = decodedText.slice(8);
+                        const jsonStr = LZString.decompressFromEncodedURIComponent(compressed);
                         const parsed = JSON.parse(jsonStr);
                         
                         // Enhanced validation
@@ -3256,6 +3261,52 @@
                                 }, 800);
                             };
                             
+                            if (html5QrCode) {
+                                html5QrCode.stop().then(closeAndLoad).catch(closeAndLoad);
+                            } else {
+                                closeAndLoad();
+                            }
+                        } else {
+                            statusEl.style.color = 'var(--danger)';
+                            statusEl.textContent = 'Invalid game data format. Missing required fields.';
+                            console.error('Invalid game data:', parsed);
+                        }
+                    } catch (err) {
+                        statusEl.style.color = 'var(--danger)';
+                        statusEl.textContent = 'Failed to decompress game data: ' + err.message;
+                        console.error('Decompression error:', err);
+                    }
+                } else if (decodedText.startsWith('14HIGH:')) {
+                    try {
+                        const jsonStr = decodedText.slice(7);
+                        const parsed = JSON.parse(jsonStr);
+                        // Enhanced validation
+                        if (parsed && 
+                            Array.isArray(parsed.players) && 
+                            typeof parsed.gameStarted === 'boolean' &&
+                            typeof parsed.currentRound === 'number' &&
+                            parsed.scores && typeof parsed.scores === 'object') {
+                            // Restore full game state with defaults for missing data
+                            const fullState = {
+                                players: parsed.players,
+                                gameStarted: parsed.gameStarted,
+                                currentRound: parsed.currentRound,
+                                bids: parsed.bids || {},
+                                tricks: parsed.tricks || {},
+                                scores: parsed.scores || {},
+                                bidPhase: parsed.bidPhase !== false, // default true
+                                eliminatedPlayers: parsed.eliminatedPlayers || [],
+                                roundHistory: [] // Reset history since we didn't transfer it
+                            };
+                            localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, JSON.stringify(fullState));
+                            statusEl.style.color = 'var(--success)';
+                            statusEl.textContent = `Game imported! Found ${parsed.players.length} players, Round ${parsed.currentRound}. Loading...`;
+                            const closeAndLoad = () => {
+                                setTimeout(() => {
+                                    modal.classList.remove('active');
+                                    selectMode('offline');
+                                }, 800);
+                            };
                             if (html5QrCode) {
                                 html5QrCode.stop().then(closeAndLoad).catch(closeAndLoad);
                             } else {
