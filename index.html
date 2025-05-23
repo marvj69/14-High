@@ -740,7 +740,7 @@
         <button id="handoff-import-close" class="qr-code-close" aria-label="Close import QR"><i class="fas fa-times"></i></button>
         <h3><i class="fas fa-qrcode"></i> Import Game from QR</h3>
         <div style="font-size: 0.9rem; color: var(--gray); margin-bottom: 1rem; text-align: center;">
-          Scan a hand-off QR code from another device or paste game data manually below.
+          Scan a hand-off QR code from another device.
         </div>
         <div id="handoff-qr-reader" style="width:100%;margin:0 auto;"></div>
         <div id="handoff-import-status" style="margin-top:1rem;color:var(--gray);"></div>
@@ -3196,33 +3196,7 @@
             modal.classList.add('active');
             let html5QrCode;
             
-            // Add text input option as fallback
-            const textInputDiv = document.createElement('div');
-            textInputDiv.style.marginTop = '1rem';
-            textInputDiv.style.padding = '1rem';
-            textInputDiv.style.border = '1px solid var(--gray-light)';
-            textInputDiv.style.borderRadius = 'var(--radius)';
-            textInputDiv.innerHTML = `
-                <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">Or paste game data manually:</h4>
-                <textarea id="manual-import-data" placeholder="Paste game data here..." style="width: 100%; height: 80px; font-family: monospace; font-size: 0.8rem; padding: 0.5rem; border: 1px solid var(--gray-light); border-radius: var(--radius); resize: vertical;"></textarea>
-                <button onclick="importManualData()" style="margin-top: 0.5rem;" class="btn-small">
-                    <i class="fas fa-upload"></i> Import Data
-                </button>
-            `;
-            
-            // Add manual import function
-            window.importManualData = function() {
-                const textarea = document.getElementById('manual-import-data');
-                const data = textarea.value.trim();
-                if (data) {
-                    processImportData(data, statusEl, html5QrCode, modal);
-                } else {
-                    statusEl.style.color = 'var(--danger)';
-                    statusEl.textContent = 'Please paste game data first.';
-                }
-            };
-            
-            // Function to process import data (both QR and manual)
+            // Function to process import data (QR only)
             function processImportData(decodedText, statusEl, html5QrCode, modal) {
                 if (decodedText.startsWith('14HIGHZ:')) {
                     try {
@@ -3332,8 +3306,7 @@
             setTimeout(() => {
                 if (typeof Html5Qrcode === 'undefined') {
                     statusEl.style.color = 'var(--danger)';
-                    statusEl.textContent = 'QR scanner not available. Please use manual import below.';
-                    document.getElementById('handoff-qr-reader').appendChild(textInputDiv);
+                    statusEl.textContent = 'QR scanner not available.';
                     return;
                 }
                 
@@ -3355,28 +3328,18 @@
                     statusEl.style.color = 'var(--danger)';
                     statusEl.textContent = 'Camera error: ' + err.message;
                     console.error('Camera error:', err);
-                    // Show manual input as fallback
-                    document.getElementById('handoff-qr-reader').appendChild(textInputDiv);
                 });
-                
-                // Add manual input option below camera
-                setTimeout(() => {
-                    document.getElementById('handoff-qr-reader').appendChild(textInputDiv);
-                }, 500);
             }, 100);
             
             // Close logic
             closeBtn.onclick = () => {
                 modal.classList.remove('active');
                 if (html5QrCode) html5QrCode.stop().catch(()=>{});
-                // Clean up global functions
-                delete window.importManualData;
             };
             modal.onclick = (e) => {
                 if (e.target === modal) {
                     modal.classList.remove('active');
                     if (html5QrCode) html5QrCode.stop().catch(()=>{});
-                    delete window.importManualData;
                 }
             };
         }
