@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>14-High! (Offline & Online)</title>
-    <meta name="description" content="Play the 14-High! card game offline with local storage or online in real-time with Firebase.">
+    <title>14-High! Offline</title>
+    <meta name="description" content="Play the 14-High! card game offline with local storage.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json"> <!-- Ensure manifest.json exists -->
     <link rel="apple-touch-icon" href="icons/icon-192x192.png"> <!-- Ensure icons exist -->
@@ -13,8 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ALL CSS FROM BOTH VERSIONS MERGED HERE --- */
-        /* (Includes styles for both offline and online elements like loading overlays, game IDs, etc.) */
+        /* --- Styles for the offline web app --- */
         :root {
           --primary: #4f46e5; /* Indigo */
           --primary-hover: #4338ca;
@@ -223,6 +222,13 @@
         [data-theme="dark"] .badge-green { background-color: rgba(74, 222, 128, 0.2); }
         .trick-value { display: flex; align-items: center; justify-content: flex-start; }
         .score-value { font-weight: 600; color: var(--primary); }
+        .player-name { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+        .dealer-badge, .lead-badge {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .dealer-badge { color: var(--warning); }
+        .lead-badge { color: var(--secondary); }
 
         /* Hamburger menu styles */
         .hamburger-menu { position: fixed; top: 1rem; left: 1rem; z-index: 1000; }
@@ -462,57 +468,8 @@
             color: var(--success-light);
         }
 
-        /* Loading indicator (Online Mode) */
-        .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6);
-            color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.2rem;
-            z-index: 2000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease;
-            text-align: center; padding: 1rem;
-        }
-        .loading-overlay.active { opacity: 1; visibility: visible; }
-        .loading-overlay i { font-size: 2rem; margin-bottom: 1rem; }
-        .loading-message { max-width: 80%; }
-
-        /* Dealer/Last Player Indicators (Online Mode) */
-        .dealer-indicator { font-size: 0.7rem; font-weight: bold; margin-left: 0.5rem; padding: 0.1rem 0.4rem; border-radius: var(--radius); vertical-align: middle; }
-        .dealer-indicator { background-color: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
-        [data-theme="dark"] .dealer-indicator { background-color: rgba(251, 191, 36, 0.2); }
-        input.bid-input:disabled { background-color: var(--gray-light); cursor: not-allowed; opacity: 0.7; }
-        [data-theme="dark"] input.bid-input:disabled { background-color: var(--gray-dark); }
-
-        /* Game ID display and Join (Online Mode) */
-        .game-id-display {
-            background-color: var(--light-alt); border: 1px dashed var(--gray-light); border-radius: var(--radius);
-            padding: 0.75rem 1rem; margin-bottom: 1rem; font-family: monospace; font-size: 0.9rem; color: var(--primary);
-            display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background-color 0.2s ease;
-            position: relative; text-align: center;
-        }
-        .game-id-display:hover { 
-            background-color: var(--light); 
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        .game-id-display:after {
-            content: 'Click to show QR code';
-            display: block;
-            position: absolute;
-            bottom: -5px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.7rem;
-            background: var(--bg-color);
-            padding: 0 8px;
-            color: var(--gray);
-            font-family: sans-serif;
-        }
-        [data-theme="dark"] .game-id-display { background-color: var(--gray-dark); border-color: var(--gray); color: var(--primary); }
-        [data-theme="dark"] .game-id-display:hover { background-color: var(--dark-alt); }
-        [data-theme="dark"] .game-id-display:after { background-color: var(--dark); }
         .copy-feedback { margin-left: 0.5rem; font-size: 0.8rem; color: var(--success); opacity: 0; transition: opacity 0.3s ease; }
         .copy-feedback.visible { opacity: 1; }
-        .divider { text-align: center; margin: 1.5rem 0; color: var(--gray); font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; }
-        .divider::before, .divider::after { content: ''; flex-grow: 1; height: 1px; background-color: var(--gray-light); margin: 0 0.5rem; }
-        [data-theme="dark"] .divider::before, [data-theme="dark"] .divider::after { background-color: var(--gray-dark); }
-        #join-game-id-input { font-family: monospace; text-align: center; /* No uppercase */ }
         .error-message { color: var(--danger); font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 0.75rem; text-align: center; display: block; min-height: 1.2em; }
 
         /* Leave/Back Button */
@@ -694,6 +651,8 @@
     </style>
     <!-- QR Code library (changed to CDN version) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Compression helpers for QR hand-off payloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
     <!-- Add html5-qrcode for QR scanning -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
@@ -747,12 +706,6 @@
       </div>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay">
-      <i class="fas fa-spinner fa-spin"></i>
-      <div class="loading-message" id="loading-message">Loading...</div>
-    </div>
-
     <div class="fixed-header"></div>
     <div class="hamburger-menu">
         <button class="hamburger-btn" aria-label="Open menu"><i class="fas fa-bars"></i></button>
@@ -770,7 +723,7 @@
                 </label>
             </div>
             <div class="menu-item menu-item-back-to-menu" id="menu-back-button" style="display: none;">
-                 <span><i class="fas fa-arrow-left"></i> Back to Mode Select</span>
+                 <span><i class="fas fa-arrow-left"></i> Back to Start</span>
             </div>
 
             <div class="menu-item-header"><i class="fas fa-history"></i> Game History</div>
@@ -809,63 +762,29 @@
             <p><strong>Released:</strong> April 2025</p>
             <p><strong>What's New:</strong></p>
             <ul>
-                <li><i class="fas fa-compress-alt"></i> **Combined App:** Single page for Offline & Online play!</li>
-                <li>Choose your mode on startup.</li>
-                <li>Shared UI and core logic.</li>
-                <li><i class="fas fa-hdd"></i> Offline mode uses Local Storage.</li>
-                <li><i class="fas fa-cloud"></i> Online mode uses Firebase for real-time multiplayer.</li>
-                <li>Includes features from both previous versions (history, dark mode, game IDs, etc.).</li>
+                <li><i class="fas fa-gamepad"></i> Streamlined for fast local play.</li>
+                <li><i class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
+                <li>Includes history, dark mode, and QR hand-off tools.</li>
                 <li>Author: Mark Heinonen</li>
                 <li>(906) 299-2350</li>
 
             </ul>
         </div>
     </div>
-
-    <!-- Firebase SDK (Only needed for Online mode) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
     <script>
         // --- Constants & Config ---
         const MAX_PLAYERS = 56;
         const ELIMINATION_THRESHOLD = 56;
         const LOCAL_STORAGE_OFFLINE_KEY = 'offlineGameState';
-        const LOCAL_STORAGE_HISTORY_KEY = 'completedGames'; // Shared history key
+        const LOCAL_STORAGE_HISTORY_KEY = 'completedGames';
         const LOCAL_STORAGE_THEME_KEY = 'theme';
-        const DEBOUNCE_DELAY = 300; // Debounce delay in milliseconds for online input
-        const RENDER_THROTTLE = 300; // Increased from 150ms to 300ms for smoother rendering
-        const FIREBASE_UPDATE_BUFFER = 50; // Additional delay before rendering after Firebase updates
-
-        // IMPORTANT: Replace with your actual Firebase config if using Online mode
-        const firebaseConfig = {
-          apiKey: "AIzaSyAwrUIh07PQwXP4w_UtA_GWqY1BnI-29fA",
-          authDomain: "asphalt-yield-calculator.firebaseapp.com",
-          databaseURL: "https://asphalt-yield-calculator-default-rtdb.firebaseio.com",
-          projectId: "asphalt-yield-calculator",
-          storageBucket: "asphalt-yield-calculator.firebasestorage.app",
-          messagingSenderId: "976877514620",
-          appId: "1:976877514620:web:cc15b1bdaf19c4a53b7ef9",
-          measurementId: "G-NM5V8EXM44"
-        };
 
         // --- Global State ---
-        let currentMode = 'entry'; // 'entry', 'offline', 'online-entry', 'online-game'
+        let currentMode = 'entry'; // 'entry' or 'offline'
         let offlineState = {};
-        let onlineState = {}; // Cache of Firebase data for the current game
-        let currentGameId = null; // Online mode: ID of the current Firebase game
-        let gameRef = null; // Online mode: Firebase reference to the current game
-        let gameListenerHandle = null; // Online mode: Firebase listener handle
-        let localHistory = []; // Shared completed games history
-        let firebaseInitialized = false;
-        let firebaseConnected = false;
-        let initialConnectionEstablished = false;
+        let localHistory = [];
         let previousHtml = ''; // Track previous HTML for diffing
         let darkMode = false;
-        let pendingUpdates = {}; // Store pending Firebase updates
-        let debounceTimers = {}; // Store debounce timers
-        let lastRenderTime = 0; // Track last render time for throttling
-        let pendingRender = false; // Track if render is pending
 
         // --- DOM Elements ---
         const app = document.getElementById('app');
@@ -880,102 +799,38 @@
         const versionModal = document.getElementById('version-modal');
         const versionClose = document.getElementById('version-close');
         const eliminationBanner = document.getElementById('elimination-banner');
-        const loadingOverlay = document.getElementById('loading-overlay');
         const gameDetailsModal = document.getElementById('game-details-modal');
         const gameDetailsClose = document.getElementById('game-details-close');
         const gameDetailsBody = document.getElementById('game-details-body');
 
         // --- Initialization ---
         function initializeApp() {
-            // Load theme preference
             const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
             if (savedTheme === 'dark') {
                 darkMode = true;
-                document.body.setAttribute('data-theme', 'dark');
                 if (darkModeToggle) darkModeToggle.checked = true;
-            }
-
-            // Load completed games history
-            loadLocalHistory();
-
-            // Initialize Firebase if Online mode
-            if (window.location.search.includes('game=')) {
-                // When launched via QR code with game parameter, go straight to online mode
-                selectMode('online');
-                // joinOnlineGame will handle the URL parameter automatically
+                applyTheme('dark');
             } else {
-                // Normal startup - render initial screen
-                renderApp();
+                applyTheme('light');
             }
 
-            // Set up click handlers (Delegated)
-            app.addEventListener('click', handleAppClick);
-            document.body.addEventListener('keypress', handleAppKeyPress);
-            app.addEventListener('input', handleAppInput);
+            loadLocalHistory();
+            renderApp();
+            menuBackButton.style.display = 'none';
 
-            // Menu and mode select handlers
+            app.addEventListener('click', handleAppClick);
+            app.addEventListener('keypress', handleAppKeyPress);
+            app.addEventListener('input', handleAppInput);
+            app.addEventListener('focusin', (e) => {
+                if (e.target.matches('input[type=\"number\"], input[type=\"text\"]')) {
+                    e.target.select();
+                }
+            });
+
             hamburgerBtn.addEventListener('click', () => menuContent.classList.add('active'));
             menuClose.addEventListener('click', () => menuContent.classList.remove('active'));
-            gameDetailsClose.addEventListener('click', closeGameDetailsModal);
-            gameDetailsModal.addEventListener('click', (e) => {
-                if (e.target === gameDetailsModal) closeGameDetailsModal();
-            });
-            // Dark mode toggle
-            darkModeToggle.addEventListener('change', () => {
-                darkMode = darkModeToggle.checked;
-                document.body.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-                localStorage.setItem(LOCAL_STORAGE_THEME_KEY, darkMode ? 'dark' : 'light');
-            });
-
-            // Menu back button
             menuBackButton.addEventListener('click', goBackToEntry);
 
-            // Completed games list item click
-            completedGamesList.addEventListener('click', (e) => {
-                const gameItem = e.target.closest('.completed-game-item');
-                if (gameItem) {
-                    const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
-                    if (!isNaN(gameIndex)) showGameDetails(gameIndex);
-                }
-            });
-
-            // Check for elimination warning for online games
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && currentMode === 'online-game' && onlineState.gameStarted) {
-                    // Re-check elimination warning when tab becomes visible
-                     checkUpcomingElimination(onlineState);
-                }
-            });
-
-            // Elimination banner dismiss
-            if (eliminationBanner) {
-                eliminationBanner.addEventListener('click', (e) => {
-                    if (e.target.closest('.elimination-dismiss')) {
-                        eliminationBanner.style.display = 'none';
-                    }
-                });
-            }
-            
-            // Bind common UI event handlers (version badge, escape key, modal clicks)
-            setupCommonEventListeners();
-
-            // Hand-off QR event listeners
-            document.body.addEventListener('click', function(e) {
-                // Export (Hand-off via QR)
-                if (e.target.closest('#handoff-qr-btn')) {
-                    showHandoffQRModal();
-                }
-                // Import (Scan QR)
-                if (e.target.closest('#handoff-import-btn')) {
-                    showHandoffImportModal();
-                }
-            });
-        }
-
-        function setupCommonEventListeners() {
-            // Hamburger menu
-            hamburgerBtn.addEventListener('click', () => menuContent.classList.add('active'));
-            menuClose.addEventListener('click', () => menuContent.classList.remove('active'));
             document.addEventListener('click', (e) => {
                 if (menuContent.classList.contains('active') && !menuContent.contains(e.target) && !hamburgerBtn.contains(e.target)) {
                     menuContent.classList.remove('active');
@@ -987,6 +842,7 @@
                     closeGameDetailsModal();
                 }
             });
+
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     if (menuContent.classList.contains('active')) menuContent.classList.remove('active');
@@ -994,56 +850,74 @@
                     if (gameDetailsModal.classList.contains('active')) closeGameDetailsModal();
                 }
             });
-            menuBackButton.addEventListener('click', goBackToEntry);
 
-            // Dark mode
-            darkModeToggle.addEventListener('change', () => applyTheme(darkModeToggle.checked ? 'dark' : 'light'));
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('change', () => applyTheme(darkModeToggle.checked ? 'dark' : 'light'));
+            }
 
-            // Version modal
-            versionBadge.addEventListener('click', (e) => { e.stopPropagation(); versionModal.classList.add('active'); });
-            versionClose.addEventListener('click', () => versionModal.classList.remove('active'));
+            if (versionBadge) {
+                versionBadge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    versionModal.classList.add('active');
+                });
+            }
+            if (versionClose) {
+                versionClose.addEventListener('click', () => versionModal.classList.remove('active'));
+            }
 
-            // Game details modal
-            gameDetailsClose.addEventListener('click', closeGameDetailsModal);
-            completedGamesList.addEventListener('click', (e) => {
-                const gameItem = e.target.closest('.completed-game-item');
-                if (gameItem) {
-                    const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
-                    if (!isNaN(gameIndex)) showGameDetails(gameIndex);
+            if (gameDetailsClose) {
+                gameDetailsClose.addEventListener('click', closeGameDetailsModal);
+            }
+            if (completedGamesList) {
+                completedGamesList.addEventListener('click', (e) => {
+                    const gameItem = e.target.closest('.completed-game-item');
+                    if (gameItem) {
+                        const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
+                        if (!isNaN(gameIndex)) showGameDetails(gameIndex);
+                    }
+                });
+            }
+            if (gameDetailsModal) {
+                gameDetailsModal.addEventListener('click', (e) => {
+                    if (e.target === gameDetailsModal) closeGameDetailsModal();
+                });
+            }
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && currentMode === 'offline' && offlineState.gameStarted) {
+                    checkUpcomingElimination(offlineState);
                 }
             });
 
-            // Main app container for dynamic elements
-            app.addEventListener('click', handleAppClick);
-            app.addEventListener('keypress', handleAppKeyPress);
-            app.addEventListener('input', handleAppInput);
-            app.addEventListener('focusin', (e) => {
-                if (e.target.matches('input[type="number"]') || e.target.matches('input[type="text"]')) {
-                    e.target.select();
+            if (eliminationBanner) {
+                eliminationBanner.addEventListener('click', (e) => {
+                    if (e.target.closest('.elimination-dismiss')) {
+                        eliminationBanner.style.display = 'none';
+                    }
+                });
+            }
+
+            document.body.addEventListener('click', (e) => {
+                if (e.target.closest('#handoff-qr-btn')) {
+                    showHandoffQRModal();
+                }
+                if (e.target.closest('#handoff-import-btn')) {
+                    showHandoffImportModal();
                 }
             });
         }
 
         // --- Mode Selection & Switching ---
         function selectMode(mode) {
-            console.log("Selecting mode:", mode);
             hideEliminationBanner();
             if (mode === 'offline') {
                 currentMode = 'offline';
                 loadOfflineState();
                 menuBackButton.style.display = 'block';
                 renderApp();
-            } else if (mode === 'online') {
-                currentMode = 'online-entry'; // Go to the online create/join screen
-                initializeFirebaseIfNeeded(); // Initialize FB now
-                menuBackButton.style.display = 'block';
-                renderApp();
             } else { // Go back to entry
                 currentMode = 'entry';
-                detachGameListener(); // Clean up online stuff if any
                 offlineState = {}; // Clear offline state
-                onlineState = {}; // Clear online cache
-                currentGameId = null;
                 menuBackButton.style.display = 'none';
                 renderApp();
             }
@@ -1065,392 +939,163 @@
         }
 
         function goBackToEntry() {
-            if (currentMode === 'online-game' || currentMode === 'online-entry') {
-                 if (currentMode === 'online-game' && confirm("Are you sure you want to leave this online game?")) {
-                     leaveOnlineGame(false); // Leave without rendering entry screen yet
-                     selectMode('entry'); // Now render entry screen
-                 } else if (currentMode === 'online-entry') {
-                     selectMode('entry'); // Just go back if on create/join screen
-                 }
-            } else if (currentMode === 'offline') {
-                 if (offlineState.gameStarted && confirm("Are you sure you want to leave this offline game? Progress might be saved.")) {
+            if (currentMode === 'offline') {
+                if (!offlineState.gameStarted || confirm("Are you sure you want to leave this offline game? Progress might be saved.")) {
                     selectMode('entry');
-                 } else if (!offlineState.gameStarted) {
-                    selectMode('entry');
-                 }
-            }
-            menuContent.classList.remove('active'); // Close menu after action
-        }
-
-        // --- Firebase Initialization and Connection (Online Mode) ---
-        function initializeFirebaseIfNeeded() {
-            if (firebaseInitialized) return;
-            try {
-                console.log("Initializing Firebase...");
-                firebase.initializeApp(firebaseConfig);
-                firebaseInitialized = true;
-                monitorFirebaseConnection();
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                alert("Failed to initialize online services. Please check configuration or try offline mode.");
-                currentMode = 'entry'; // Fallback to entry screen
-            }
-        }
-
-        function monitorFirebaseConnection() {
-            const database = firebase.database();
-            database.ref(".info/connected").on("value", (snap) => {
-                if (snap.val() === true) {
-                    console.log("Firebase connected.");
-                    firebaseConnected = true;
-                    initialConnectionEstablished = true;
-                    if (currentMode === 'online-entry' || currentMode === 'online-game') {
-                        setLoading(false);
-                        if (currentMode === 'online-game' && !gameListenerHandle) {
-                            // Re-attach listener if we reconnected while in a game
-                            attachGameListener(currentGameId);
-                        } else if (currentMode === 'online-entry') {
-                            renderApp(); // Re-render entry screen if needed
-                        }
-                    }
-                } else {
-                    console.log("Firebase disconnected.");
-                    firebaseConnected = false;
-                    if (currentMode === 'online-entry' || currentMode === 'online-game') {
-                        if (initialConnectionEstablished) {
-                            setLoading(true, '<i class="fas fa-wifi"></i> Connection lost. Reconnecting...');
-                        } else {
-                            setLoading(true, 'Connecting to online services...');
-                        }
-                    }
                 }
-            });
+            } else {
+                selectMode('entry');
+            }
+            menuContent.classList.remove('active');
         }
-
         // --- Event Handlers (Delegated) ---
         function handleAppClick(e) {
             const target = e.target;
 
-            // Mode Selection Screen Actions
-            if (target.closest('#select-offline-btn')) { selectMode('offline'); return; }
-            if (target.closest('#select-online-btn')) { selectMode('online'); return; }
-
-            // Online Mode Actions
-            if (currentMode === 'online-entry') {
-                if (target.closest('#create-game-btn')) { createOnlineGame(); return; }
-                if (target.closest('#join-game-btn')) { joinOnlineGame(); return; }
-            }
-
-            // In-Game Actions (Check current mode)
-            if (currentMode === 'offline' || currentMode === 'online-game') {
-                // Player Setup (only if game not started)
-                const currentState = (currentMode === 'offline') ? offlineState : onlineState;
-                if (!currentState.gameStarted) {
-                    if (target.closest('#add-player-btn')) {
-                        currentMode === 'offline' ? addPlayerOffline() : addPlayerOnline();
-                        return;
-                    }
-                    const removeBtn = target.closest('.btn-remove');
-                    if (removeBtn) {
-                        const player = removeBtn.getAttribute('data-player');
-                        if (player) currentMode === 'offline' ? removePlayerOffline(player) : removePlayerOnline(player);
-                        return;
-                    }
-                    const moveUpBtn = target.closest('.btn-move-up');
-                    if (moveUpBtn) {
-                        const player = moveUpBtn.getAttribute('data-player');
-                        if (player) {
-                            if (currentMode === 'offline') {
-                                const idx = offlineState.players.indexOf(player);
-                                if (idx > 0) {
-                                    [offlineState.players[idx - 1], offlineState.players[idx]] = [offlineState.players[idx], offlineState.players[idx - 1]];
-                                    saveOfflineState();
-                                    renderApp();
-                                }
-                            } else {
-                                // Online: update Firebase
-                                const idx = onlineState.players.indexOf(player);
-                                if (idx > 0) {
-                                    const newPlayers = [...onlineState.players];
-                                    [newPlayers[idx - 1], newPlayers[idx]] = [newPlayers[idx], newPlayers[idx - 1]];
-                                    gameRef.update({ '/players': newPlayers });
-                                }
-                            }
-                        }
-                        return;
-                    }
-                    const moveDownBtn = target.closest('.btn-move-down');
-                    if (moveDownBtn) {
-                        const player = moveDownBtn.getAttribute('data-player');
-                        if (player) {
-                            if (currentMode === 'offline') {
-                                const idx = offlineState.players.indexOf(player);
-                                if (idx !== -1 && idx < offlineState.players.length - 1) {
-                                    [offlineState.players[idx + 1], offlineState.players[idx]] = [offlineState.players[idx], offlineState.players[idx + 1]];
-                                    saveOfflineState();
-                                    renderApp();
-                                }
-                            } else {
-                                // Online: update Firebase
-                                const idx = onlineState.players.indexOf(player);
-                                if (idx !== -1 && idx < onlineState.players.length - 1) {
-                                    const newPlayers = [...onlineState.players];
-                                    [newPlayers[idx + 1], newPlayers[idx]] = [newPlayers[idx], newPlayers[idx + 1]];
-                                    gameRef.update({ '/players': newPlayers });
-                                }
-                            }
-                        }
-                        return;
-                    }
-                    if (target.closest('#start-game-btn')) {
-                        currentMode === 'offline' ? startGameOffline() : startGameOnline();
-                        return;
-                    }
-                }
-                // Gameplay Actions (only if game started)
-                if (currentState.gameStarted) {
-                    if (target.closest('#submit-bids-btn')) {
-                        currentMode === 'offline' ? submitBidsOffline() : submitBidsOnline();
-                        return;
-                    }
-                    if (target.closest('#submit-results-btn')) {
-                        currentMode === 'offline' ? submitRoundResultsOffline() : submitRoundResultsOnline();
-                        return;
-                    }
-                    if (target.closest('#reset-game-btn')) {
-                        currentMode === 'offline' ? resetGameOffline() : resetGameOnline();
-                        return;
-                    }
-                    if (target.closest('#undo-round-btn') && currentMode === 'offline') { // Undo only makes sense offline
-                        undoRoundOffline();
-                        return;
-                    }
-                    // Leave/Back handled by menu or specific buttons
-                    if (target.closest('#leave-game-btn')) {
-                         goBackToEntry(); // Use centralized back logic
-                         return;
-                    }
-                     if (target.closest('#back-to-menu-btn')) {
-                         goBackToEntry(); // Use centralized back logic
-                         return;
-                    }
-                }
-            }
-
-            // QR code button
-            if (target.closest('#show-qr-btn') && currentMode === 'online-game' && currentGameId) {
-                showQRCode(currentGameId);
+            if (target.closest('#select-offline-btn')) {
+                selectMode('offline');
                 return;
             }
 
-            // Game ID Copy (Online Mode)
-            const gameIdDisplay = target.closest('.game-id-display');
-            if (gameIdDisplay && (currentMode === 'online-game' || currentMode === 'online-entry')) {
-                const gameId = gameIdDisplay.getAttribute('data-game-id');
-                if (gameId) {
-                    // Show QR code for the entire game-id-display
-                    showQRCode(gameId);
+            if (target.closest('#back-to-menu-btn')) {
+                goBackToEntry();
+                return;
+            }
+
+            if (currentMode !== 'offline') {
+                return;
+            }
+
+            if (!offlineState.gameStarted) {
+                if (target.closest('#add-player-btn')) {
+                    addPlayerOffline();
+                    return;
+                }
+
+                const removeBtn = target.closest('.btn-remove');
+                if (removeBtn) {
+                    const player = removeBtn.getAttribute('data-player');
+                    if (player) removePlayerOffline(player);
+                    return;
+                }
+
+                const moveUpBtn = target.closest('.btn-move-up');
+                if (moveUpBtn) {
+                    const player = moveUpBtn.getAttribute('data-player');
+                    if (player) {
+                        const idx = offlineState.players.indexOf(player);
+                        if (idx > 0) {
+                            [offlineState.players[idx - 1], offlineState.players[idx]] = [offlineState.players[idx], offlineState.players[idx - 1]];
+                            saveOfflineState();
+                            renderApp();
+                        }
+                    }
+                    return;
+                }
+
+                const moveDownBtn = target.closest('.btn-move-down');
+                if (moveDownBtn) {
+                    const player = moveDownBtn.getAttribute('data-player');
+                    if (player) {
+                        const idx = offlineState.players.indexOf(player);
+                        if (idx !== -1 && idx < offlineState.players.length - 1) {
+                            [offlineState.players[idx + 1], offlineState.players[idx]] = [offlineState.players[idx], offlineState.players[idx + 1]];
+                            saveOfflineState();
+                            renderApp();
+                        }
+                    }
+                    return;
+                }
+
+                if (target.closest('#start-game-btn')) {
+                    startGameOffline();
+                    return;
+                }
+            } else {
+                if (target.closest('#submit-bids-btn')) {
+                    submitBidsOffline();
+                    return;
+                }
+                if (target.closest('#submit-results-btn')) {
+                    submitRoundResultsOffline();
+                    return;
+                }
+                if (target.closest('#reset-game-btn')) {
+                    resetGameOffline();
+                    return;
+                }
+                if (target.closest('#undo-round-btn')) {
+                    undoRoundOffline();
+                    return;
                 }
             }
-            
-            // Copy button
-            const copyBtn = target.closest('.copy-id-btn');
-            if (copyBtn) {
-                const gameId = copyBtn.getAttribute('data-game-id');
-                if (gameId) {
-                    const feedbackId = currentMode === 'online-game' ? 
-                        `copy-feedback-gameplay-${gameId}` : `copy-feedback-${gameId}`;
-                    const feedbackEl = document.getElementById(feedbackId);
-                    
-                    // Copy to clipboard
-                    navigator.clipboard.writeText(gameId).then(() => {
-                        if (feedbackEl) {
-                            feedbackEl.classList.add('visible');
-                            setTimeout(() => feedbackEl.classList.remove('visible'), 1500);
-                        }
-                    }).catch(err => { 
-                        console.error('Failed to copy:', err); 
-                        alert('Copy failed.'); 
-                    });
-                }
+
+            if (target.closest('#leave-game-btn')) {
+                goBackToEntry();
             }
         }
 
         function handleAppKeyPress(e) {
             if (e.key !== 'Enter') return;
 
-            // Online Join on Enter
-            if (currentMode === 'online-entry' && e.target.id === 'join-game-id-input') {
+            if (currentMode !== 'offline') return;
+
+            if (!offlineState.gameStarted && e.target.id === 'player-name') {
                 e.preventDefault();
-                joinOnlineGame();
+                addPlayerOffline();
                 return;
             }
 
-            // In-Game Enter Key Actions
-             if ((currentMode === 'offline' || currentMode === 'online-game')) {
-                 const currentState = (currentMode === 'offline') ? offlineState : onlineState;
-                 const activePlayer = (currentMode === 'offline') ? e.target.getAttribute('data-player') : e.target.getAttribute('data-player'); // Assuming same attribute name
+            if (!offlineState.gameStarted) return;
 
-                 // Add Player on Enter
-                 if (!currentState.gameStarted && e.target.id === 'player-name') {
-                     e.preventDefault();
-                     currentMode === 'offline' ? addPlayerOffline() : addPlayerOnline();
-                     return;
-                 }
+            const bidInput = e.target.closest('.bid-input');
+            const trickInput = e.target.closest('.trick-input');
 
-                 // Bid/Trick Input Navigation/Submission
-                 if (currentState.gameStarted) {
-                    const bidInput = e.target.closest('.bid-input');
-                    const trickInput = e.target.closest('.trick-input');
+            if (bidInput && offlineState.bidPhase && !bidInput.disabled) {
+                e.preventDefault();
+                const allEnabledBidInputs = Array.from(app.querySelectorAll('.bid-input:not([disabled])'));
+                const currentIndex = allEnabledBidInputs.findIndex(input => input === bidInput);
+                const nextInput = allEnabledBidInputs[currentIndex + 1];
 
-                    if (bidInput && currentState.bidPhase && !bidInput.disabled) {
-                        e.preventDefault();
-                         // Focus next enabled input or submit if last
-                        const allEnabledBidInputs = Array.from(app.querySelectorAll('.bid-input:not([disabled])'));
-                        const currentIndex = allEnabledBidInputs.findIndex(input => input === bidInput);
-                        const nextInput = allEnabledBidInputs[currentIndex + 1];
-
-                        if (nextInput) {
-                            nextInput.focus();
-                            nextInput.select();
-                        } else if (allBidsEntered(currentState)) {
-                           currentMode === 'offline' ? submitBidsOffline() : submitBidsOnline();
-                        }
-                    } else if (trickInput && !currentState.bidPhase) {
-                         e.preventDefault();
-                         // Focus next input or submit if last
-                         const allTrickInputs = Array.from(app.querySelectorAll('.trick-input'));
-                         const currentIndex = allTrickInputs.findIndex(input => input === trickInput);
-                         const nextInput = allTrickInputs[currentIndex + 1];
-
-                         if (nextInput) {
-                             nextInput.focus();
-                             nextInput.select();
-                         } else if (allTricksEntered(currentState) && validateTricksTotal(currentState)) {
-                             currentMode === 'offline' ? submitRoundResultsOffline() : submitRoundResultsOnline();
-                         }
-                    }
-                 }
-             }
-        }
-
-        // Add debounce function to prevent excessive Firebase updates
-        function debounce(func, delay, key) {
-            return function(...args) {
-                if (debounceTimers[key]) {
-                    clearTimeout(debounceTimers[key]);
+                if (nextInput) {
+                    nextInput.focus();
+                    nextInput.select();
+                } else if (allBidsEntered(offlineState)) {
+                    submitBidsOffline();
                 }
-                debounceTimers[key] = setTimeout(() => {
-                    func.apply(this, args);
-                    delete debounceTimers[key];
-                }, delay);
-            };
-        }
+            } else if (trickInput && !offlineState.bidPhase) {
+                e.preventDefault();
+                const allTrickInputs = Array.from(app.querySelectorAll('.trick-input'));
+                const currentIndex = allTrickInputs.findIndex(input => input === trickInput);
+                const nextInput = allTrickInputs[currentIndex + 1];
 
-        // Add throttle function to prevent excessive rendering
-        function throttledRender() {
-            const now = Date.now();
-            if (now - lastRenderTime >= RENDER_THROTTLE) {
-                renderApp();
-                lastRenderTime = now;
-                pendingRender = false;
-            } else if (!pendingRender) {
-                pendingRender = true;
-                setTimeout(() => {
-                    // Only render if no more updates have come in during the wait
-                    if (pendingRender) {
-                        renderApp();
-                        lastRenderTime = Date.now();
-                        pendingRender = false;
-                    }
-                }, RENDER_THROTTLE - (now - lastRenderTime));
+                if (nextInput) {
+                    nextInput.focus();
+                    nextInput.select();
+                } else if (allTricksEntered(offlineState) && validateTricksTotal(offlineState)) {
+                    submitRoundResultsOffline();
+                }
             }
         }
 
         function handleAppInput(e) {
+            if (currentMode !== 'offline') return;
+
             const target = e.target;
+            const bidInput = target.closest('.bid-input');
+            const trickInput = target.closest('.trick-input');
 
-            // Offline Input Handling
-            if (currentMode === 'offline') {
-                 const bidInput = target.closest('.bid-input');
-                 const trickInput = target.closest('.trick-input');
-                 if (bidInput && offlineState.gameStarted && offlineState.bidPhase) {
-                     const player = bidInput.getAttribute('data-player');
-                     const value = bidInput.value;
-                     if (player) handleBidChangeOffline(player, value);
-                 } else if (trickInput && offlineState.gameStarted && !offlineState.bidPhase) {
-                     const player = trickInput.getAttribute('data-player');
-                     const value = trickInput.value;
-                     if (player) handleTricksChangeOffline(player, value);
-                 }
-            }
-            // Online Input Handling (Write to Firebase) - Now with debouncing
-            else if (currentMode === 'online-game') {
-                const bidInput = target.closest('.bid-input');
-                const trickInput = target.closest('.trick-input');
-                
-                if (bidInput && onlineState.gameStarted && onlineState.bidPhase && !bidInput.disabled && gameRef) {
-                    const player = bidInput.getAttribute('data-player');
-                    const value = bidInput.value;
-                    const bidValue = value === '' ? null : parseInt(value);
-
-                    if (player && bidValue !== undefined) { // Ensure player exists and value is parseable or null
-                        if (bidValue !== null && (isNaN(bidValue) || bidValue < 0 || bidValue > onlineState.currentRound)) {
-                            // Simple client-side validation before write
-                            bidInput.value = onlineState.bids[player] ?? ''; // Revert UI immediately
-                            return;
-                        }
-                        // Dealer check *before* writing
-                        if (isDealer(player, onlineState)) {
-                            const potentialTotal = calculatePotentialBidTotal(player, bidValue, onlineState);
-                            if (potentialTotal === onlineState.currentRound) {
-                                updateValidationAndButtons(); // Show warning but don't write
-                                return;
-                            }
-                        }
-                        
-                        // Store data locally first for immediate feedback BUT DON'T RENDER YET
-                        if (!onlineState.bids) onlineState.bids = {};
-                        onlineState.bids[player] = bidValue;
-                        updateValidationAndButtons(); // Update UI hints immediately without full rerender
-                        
-                        // Debounce Firebase update
-                        const updateBid = debounce((playerName, value) => {
-                            gameRef.child('bids').child(playerName).set(value)
-                               .catch(err => console.error(`Firebase bid write failed:`, err));
-                        }, DEBOUNCE_DELAY, `bid-${player}`);
-                        
-                        updateBid(player, bidValue);
-                    }
-                } else if (trickInput && onlineState.gameStarted && !onlineState.bidPhase && gameRef) {
-                    const player = trickInput.getAttribute('data-player');
-                    const value = trickInput.value;
-                    const tricksValue = value === '' ? null : parseInt(value);
-
-                    if (player && tricksValue !== undefined) {
-                        if (tricksValue !== null && (isNaN(tricksValue) || tricksValue < 0 || tricksValue > 14)) {
-                            trickInput.value = onlineState.tricks[player] ?? ''; // Revert UI immediately
-                            return;
-                        }
-                        
-                        // Store data locally first for immediate feedback BUT DON'T RENDER YET
-                        if (!onlineState.tricks) onlineState.tricks = {};
-                        onlineState.tricks[player] = tricksValue;
-                        updateValidationAndButtons(); // Update UI hints immediately without full rerender
-                        
-                        // Debounce Firebase update
-                        const updateTrick = debounce((playerName, value) => {
-                            gameRef.child('tricks').child(playerName).set(value)
-                               .catch(err => console.error(`Firebase trick write failed:`, err));
-                        }, DEBOUNCE_DELAY, `trick-${player}`);
-                        
-                        updateTrick(player, tricksValue);
-                    }
-                }
+            if (bidInput && offlineState.gameStarted && offlineState.bidPhase) {
+                const player = bidInput.getAttribute('data-player');
+                const value = bidInput.value;
+                if (player) handleBidChangeOffline(player, value);
+            } else if (trickInput && offlineState.gameStarted && !offlineState.bidPhase) {
+                const player = trickInput.getAttribute('data-player');
+                const value = trickInput.value;
+                if (player) handleTricksChangeOffline(player, value);
             }
         }
 
-        // --- Core Rendering Logic ---
         function renderApp() {
             let newHtml = '';
             let currentState = {};
@@ -1459,19 +1104,8 @@
                 newHtml = renderEntryScreen();
             } else if (currentMode === 'offline') {
                 currentState = offlineState;
-                if (!currentState.gameStarted) newHtml = renderPlayerSetup(currentState, 'offline');
-                else newHtml = renderGameplay(currentState, 'offline');
-            } else if (currentMode === 'online-entry') {
-                newHtml = renderOnlineEntryScreen();
-            } else if (currentMode === 'online-game') {
-                currentState = onlineState;
-                 if (Object.keys(currentState).length === 0 && currentGameId) { // Still loading FB data
-                    newHtml = renderLoadingGameScreen();
-                 } else if (!currentState.gameStarted) {
-                    newHtml = renderPlayerSetup(currentState, 'online');
-                 } else {
-                    newHtml = renderGameplay(currentState, 'online');
-                 }
+                if (!currentState.gameStarted) newHtml = renderPlayerSetup(currentState);
+                else newHtml = renderGameplay(currentState);
             } else {
                 newHtml = '<div class="card"><p>Error: Invalid application state.</p></div>';
             }
@@ -1520,8 +1154,8 @@
             
             applyPostRenderFocus(currentState);
 
-            // Always update validation/buttons after render, especially for online mode updates
-            if (currentMode === 'offline' || currentMode === 'online-game') {
+            // Always update validation/buttons after render for the active offline game
+            if (currentMode === 'offline') {
                  updateValidationAndButtons();
                  if (currentState.gameStarted && currentState.currentRound <= 14) {
                     setTimeout(() => checkUpcomingElimination(currentState), 0);
@@ -1568,10 +1202,7 @@
             if (currentMode === 'entry') {
                  const offlineBtn = document.getElementById('select-offline-btn');
                  if (offlineBtn) offlineBtn.focus();
-            } else if (currentMode === 'online-entry') {
-                 const joinInput = document.getElementById('join-game-id-input');
-                 if (joinInput) joinInput.focus();
-            } else if (currentMode === 'offline' || currentMode === 'online-game') {
+            } else if (currentMode === 'offline') {
                  if (!currentState.gameStarted) {
                     const playerNameInput = document.getElementById('player-name');
                     if (playerNameInput) playerNameInput.focus();
@@ -1595,13 +1226,13 @@
         }
 
         function updateValidationAndButtons() {
-            const state = (currentMode === 'offline') ? offlineState : onlineState;
+            if (currentMode !== 'offline') return;
+
+            const state = offlineState;
             if (!state || !state.gameStarted || state.currentRound > 14) return; // Only run if in a started game
 
             const totalBids = calculateTotalBids(state.bids, state.players);
             const totalTricks = calculateTotalTricks(state.tricks, state.players);
-            const dealerName = (currentMode === 'online-game') ? getDealerName(state) : null; // Only relevant online
-            const dealerBid = (dealerName && state.bids && state.bids[dealerName] !== undefined && state.bids[dealerName] !== null) ? state.bids[dealerName] : undefined;
             const players = state.players || [];
 
             // --- Update Bid Info/Warning ---
@@ -1609,7 +1240,7 @@
             if (bidInfoEl && state.bidPhase) {
                 if (allPlayersHaveBid(state)) {
                     if (totalBids === state.currentRound) {
-                        bidInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Invalid: Total bids cannot equal ${state.currentRound} (currently ${totalBids}). ${dealerName ? escapeHtml(dealerName) + ' must change bid.' : ''}`;
+                        bidInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Invalid: Total bids cannot equal ${state.currentRound} (currently ${totalBids}).`;
                         bidInfoEl.className = 'game-info bid-warning';
                     } else {
                         bidInfoEl.innerHTML = `<i class="fas fa-check-circle"></i> Valid Bids: Total ${totalBids}`;
@@ -1664,90 +1295,24 @@
             
             return `
                 <div class="card mode-selection-container">
-                    <h2><i class="fas fa-dice"></i> Choose Your Game Mode</h2>
+                    <h2><i class="fas fa-dice"></i> Start a Game</h2>
                     <div class="card">
                         <h3><i class="fas fa-user-friends"></i> Play Offline</h3>
                         <p>Play solo or pass the device around. Game progress is saved locally in your browser.</p>
                         <button id="select-offline-btn" class="btn-full">${offlineButtonText}</button>
                         <button id="handoff-import-btn" class="btn-small" style="margin-top:0.5rem;"><i class="fas fa-qrcode"></i> Import from QR</button>
                     </div>
-                    <div class="card">
-                        <h3><i class="fas fa-globe-americas"></i> Play Online</h3>
-                        <p>Create or join a game room to play with friends in real-time. Requires internet connection.</p>
-                        <button id="select-online-btn" class="btn-full btn-green"><i class="fas fa-wifi"></i> Go Online</button>
-                    </div>
                 </div>
             `;
         }
 
-        function renderOnlineEntryScreen() {
-            // Same as the previous online version's entry screen
-            return `
-            <div class="card">
-                <h2><i class="fas fa-door-open"></i> Online: Join or Create Game</h2>
-                <p style="color: var(--gray); margin-bottom: 1.5rem; text-align: center;">Create a new game room or enter the ID of an existing one.</p>
 
-                 <div class="card" style="background-color: var(--light-alt);">
-                     <h3><i class="fas fa-plus-circle"></i> Create New Game</h3>
-                     <p style="font-size: 0.9rem; color: var(--gray); margin-bottom: 1rem;">Generates a unique Game ID for others to join.</p>
-                     <button id="create-game-btn" class="btn-full btn-green">
-                         <i class="fas fa-magic"></i> Create New Game
-                     </button>
-                </div>
-
-                <div class="divider">OR</div>
-
-                <div class="card" style="background-color: var(--light-alt);">
-                    <h3><i class="fas fa-link"></i> Join Existing Game</h3>
-                     <div class="input-group">
-                        <div class="input-with-button">
-                            <input type="text" id="join-game-id-input" placeholder="Enter Game ID" aria-label="Game ID to join" oninput="this.value = this.value.toUpperCase()">
-                            <button class="btn-add" id="join-game-btn"><i class="fas fa-sign-in-alt"></i> Join</button>
-                        </div>
-                     </div>
-                     <div id="join-error" class="error-message"></div>
-                </div>
-                <button id="back-to-menu-btn" class="btn-full btn-outline" style="margin-top: 1.5rem;"><i class="fas fa-arrow-left"></i> Back to Mode Select</button>
-            </div>
-            `;
-        }
-
-        function renderLoadingGameScreen() {
-             return `
-                <div class="card">
-                    <h2><i class="fas fa-spinner fa-spin"></i> Loading Game...</h2>
-                    <p style="text-align: center; color: var(--gray); padding: 2rem 0;">
-                        Fetching data for Game ID: ${escapeHtml(currentGameId || 'N/A')}
-                    </p>
-                </div>
-            `;
-        }
-
-        function renderPlayerSetup(currentState, mode) {
-             // Common player setup UI, potentially with mode-specific elements like Game ID display
-             const isOnline = mode === 'online';
-             const gameIdHtml = isOnline && currentGameId ? `
-                 <div style="margin-bottom: 1.5rem;">
-                    <h3 style="font-size: 0.9rem; color: var(--gray); margin-bottom: 0.5rem;">Share this Game ID:</h3>
-                    <div class="game-id-display" data-game-id="${escapeHtml(currentGameId)}" title="Click to show QR code">
-                        <span style="overflow-wrap: break-word; word-break: break-all; margin: 0 auto;">${escapeHtml(currentGameId)}</span>
-                        <i class="fas fa-qrcode" style="margin-left: 8px;"></i>
-                    </div>
-                    <div style="display: flex; justify-content: center; margin-top: 0.5rem;">
-                        <button class="btn-small copy-id-btn" data-game-id="${escapeHtml(currentGameId)}">
-                            <i class="far fa-copy"></i> Copy ID
-                        </button>
-                        <span class="copy-feedback" id="copy-feedback-${escapeHtml(currentGameId)}" style="margin-left: 0.5rem; line-height: 1.8;">Copied!</span>
-                    </div>
-                 </div>
-              ` : '';
-
-              const players = currentState.players || [];
+        function renderPlayerSetup(currentState) {
+             const players = currentState.players || [];
 
              return `
                 <div class="card">
-                  <h2><i class="fas fa-users-cog"></i> Player Setup ${isOnline ? '(Online)' : '(Offline)'}</h2>
-                  ${gameIdHtml}
+                  <h2><i class="fas fa-users-cog"></i> Player Setup</h2>
 
                    <div class="input-group">
                      <div class="input-with-button">
@@ -1762,7 +1327,10 @@
                        <div class="player-list">
                          ${players.map((player, idx) => `
   <div class="player-item">
-    <span>${escapeHtml(player)}</span>
+    <span class="player-name">
+      ${escapeHtml(player)}
+      ${idx === 0 ? '<span class="dealer-badge"><i class="fas fa-crown"></i> Dealer</span>' : ''}
+    </span>
     <div style="display: flex; gap: 0.25rem; align-items: center;">
       <button class="btn-move-up" data-player="${escapeHtml(player)}" ${idx === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(player)} up" tabindex="0" title="Move up">
         <i class="fas fa-arrow-up"></i>
@@ -1790,18 +1358,16 @@
                        ? 'Need at least 2 players'
                        : `Start Game (${players.length} Players)`}
                    </button>
-
                    <div class="button-group" style="margin-top: 1.5rem; justify-content: center;">
-                       <button id="back-to-menu-btn" class="btn-outline"><i class="fas fa-arrow-left"></i> Back to Mode Select</button>
-                       ${!isOnline ? `<button id="handoff-import-btn" class="btn-small"><i class="fas fa-qrcode"></i> Import from QR</button>` : ''}
+                       <button id="back-to-menu-btn" class="btn-outline"><i class="fas fa-arrow-left"></i> Back to Start</button>
+                       <button id="handoff-import-btn" class="btn-small"><i class="fas fa-qrcode"></i> Import from QR</button>
                    </div>
                 </div>
              `;
         }
 
-        function renderGameplay(currentState, mode) {
-            // Common gameplay UI, rendered using the provided state
-            const isOnline = mode === 'online';
+        function renderGameplay(currentState) {
+            // Offline gameplay UI
             let gameplayHtml = '';
             const currentRound = currentState.currentRound || 1;
             const players = currentState.players || [];
@@ -1810,31 +1376,31 @@
             const bids = currentState.bids || {};
             const tricks = currentState.tricks || {};
             const bidPhase = currentState.bidPhase === undefined ? true : currentState.bidPhase;
-            const dealerName = isOnline ? getDealerName(currentState) : null;
+            const dealerIndex = (Number.isInteger(currentState.dealerIndex) && players.length > 0)
+                ? ((currentState.dealerIndex % players.length) + players.length) % players.length
+                : 0;
+            const dealerName = players.length > 0 ? players[dealerIndex] : null;
+            let orderedPlayers = [...players];
+            if (players.length > 1) {
+                const startingIndex = (dealerIndex + 1) % players.length;
+                orderedPlayers = [];
+                for (let i = 0; i < players.length; i++) {
+                    orderedPlayers.push(players[(startingIndex + i) % players.length]);
+                }
+            }
+            const startingBidder = orderedPlayers.length > 0 ? orderedPlayers[0] : null;
+            const highlightLead = players.length > 1;
 
             // --- Round Input / Game Over ---
             if (currentRound <= 14) {
                 const bidInfoHtml = bidPhase ? '<div id="bid-info" class="game-info"></div>' : '';
                 const tricksInfoHtml = !bidPhase ? '<div id="trick-info" class="game-info"></div>' : '';
-                const gameIdHeaderHtml = isOnline && currentGameId ? `
-                    <div>
-                        <div style="font-size: 0.8rem; margin-bottom: 0.5rem; text-align: center; color: var(--gray);">
-                            Game ID: ${escapeHtml(currentGameId)}
-                            <button class="btn-text copy-id-btn" data-game-id="${escapeHtml(currentGameId)}" style="margin-left: 0.5rem; font-size: 0.8rem; padding: 0.2rem 0.4rem;">
-                                <i class="far fa-copy"></i>
-                            </button>
-                            <span class="copy-feedback" id="copy-feedback-gameplay-${escapeHtml(currentGameId)}" style="margin-left: 0.2rem; font-size: 0.7rem;">Copied!</span>
-                        </div>
-                    </div>` : '';
-
                 gameplayHtml += `
                 <div class="card">
-                    ${gameIdHeaderHtml}
                     <div class="flex-between" style="margin-bottom: 0.25rem;">
-                    <h2><i class="fas fa-tasks"></i> Round ${currentRound} / 14 ${isOnline ? '(Online)' : '(Offline)'}</h2>
+                    <h2><i class="fas fa-tasks"></i> Round ${currentRound} / 14</h2>
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                         <span class="game-status">${bidPhase ? 'Bidding Phase' : 'Enter Hands Won'}</span>
-                        ${dealerName ? `<span class="game-status" style="background-color: rgba(245,158,11,0.1); color: var(--warning); border: 1px solid rgba(245,158,11,0.3);"><i class="fas fa-star"></i> Dealer: ${escapeHtml(dealerName)}</span>`: ''}
                         <div id="round-elimination-banner" style="display: none; position: static;" class="elimination-banner">
                         <i class="fas fa-exclamation-triangle"></i>
                         <span id="round-elimination-message">Upcoming elimination</span>
@@ -1854,16 +1420,20 @@
                         </tr>
                         </thead>
                         <tbody>
-                        ${players.map(player => {
-                            const isDealer = player === dealerName;
+                        ${orderedPlayers.map(player => {
                             const bidValue = bids[player] ?? '';
                             const trickValue = tricks[player] ?? '';
-                            let playerIndicators = '';
-                            if (isDealer) playerIndicators += ' <span class="dealer-indicator">D</span>';
-
+                            const isDealer = dealerName === player;
+                            const isLeader = highlightLead && (startingBidder === player);
                             return `
                             <tr>
-                            <td>${escapeHtml(player)} ${playerIndicators}</td>
+                            <td>
+                                <span class="player-name">
+                                    ${escapeHtml(player)}
+                                    ${isDealer ? '<span class="dealer-badge"><i class="fas fa-crown"></i> Dealer</span>' : ''}
+                                    ${isLeader ? '<span class="lead-badge"><i class="fas fa-hand-point-right"></i> Leads</span>' : ''}
+                                </span>
+                            </td>
                             <td>
                                 ${bidPhase
                                 ? `<input type="number" min="0" max="${currentRound}" value="${bidValue}"
@@ -1902,14 +1472,9 @@
                 `;
             } else { // Game Over
                  const winners = getWinners(currentState);
-                 const gameIdFooterHtml = isOnline && currentGameId ? `
-                    <div style="font-size: 0.8rem; color: var(--gray); text-align: center; margin-top:-0.5rem; margin-bottom: 1rem;">
-                        Game ID: ${escapeHtml(currentGameId)}
-                    </div>` : '';
                  gameplayHtml += `
                     <div class="card">
-                        <h2><i class="fas fa-trophy"></i> Game Over! ${isOnline ? '(Online)' : '(Offline)'}</h2>
-                        ${gameIdFooterHtml}
+                        <h2><i class="fas fa-trophy"></i> Game Over!</h2>
                         ${winners.length > 0
                         ? `<div class="winner-display">
                             <h3>${winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h3>
@@ -1921,16 +1486,16 @@
                         : '<p style="text-align:center; color: var(--gray);">Could not determine winner.</p>'}
 
                         <button id="reset-game-btn" class="btn-full btn-red">
-                           <i class="fas fa-power-off"></i> Start New Game ${isOnline ? '(Resets Room)' : ''}
+                           <i class="fas fa-power-off"></i> Start New Game
                         </button>
                          <button id="back-to-menu-btn" class="btn-full btn-outline" style="margin-top: 0.75rem;">
-                            <i class="fas fa-arrow-left"></i> Back to Mode Select
+                            <i class="fas fa-arrow-left"></i> Back to Start
                         </button>
                     </div>
                  `;
             }
 
-            // --- Scoreboard (Common for both modes) ---
+            // --- Scoreboard ---
              const allPlayersForScoreboard = [...new Set([...(currentState.players || []), ...(currentState.eliminatedPlayers || [])])];
              const sortedPlayers = getSortedPlayers(scores, allPlayersForScoreboard);
 
@@ -1965,11 +1530,10 @@
                 ${currentRound <= 14 ? `
                     <div class="flex-between">
                     <div class="button-group">
-                         ${!isOnline ? `<button id="undo-round-btn" class="btn-outline"><i class="fas fa-undo-alt"></i> Undo Round</button>` : ''}
+                         <button id="undo-round-btn" class="btn-outline"><i class="fas fa-undo-alt"></i> Undo Round</button>
                          <button id="leave-game-btn" class="btn-leave-game"><i class="fas fa-sign-out-alt"></i> Leave</button>
                          <button id="reset-game-btn" class="btn-red"><i class="fas fa-power-off"></i> Reset Game</button>
-                         ${isOnline && currentGameId ? `<button id="show-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i></button>` : ''}
-                         ${!isOnline ? `<button id="handoff-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i> Hand-off via QR</button>` : ''}
+                         <button id="handoff-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i> Hand-off via QR</button>
                     </div>
                     <p>Round ${currentRound} / 14</p>
                     </div>
@@ -1980,26 +1544,27 @@
         }
 
         function renderCompletedGames() {
-            // Always uses local history
-            completedGamesList.innerHTML = localHistory.length > 0
-                ? localHistory.slice().reverse().map((game, index) => {
-                    const originalIndex = localHistory.length - 1 - index;
-                    game.eliminatedPlayers = game.eliminatedPlayers || [];
-                    const allParticipants = [...new Set([...(game.players || []), ...game.eliminatedPlayers])];
-                    const modeBadge = game.mode === 'online' ? '<span class="badge badge-blue" style="font-size:0.7rem; margin-left: 5px;">Online</span>' : '<span class="badge" style="font-size:0.7rem; margin-left: 5px; background: rgba(107, 114, 128, 0.1); color: var(--gray);">Offline</span>';
-                    const elimCount = game.eliminatedPlayers.length ? `<span style="color: var(--danger)"><i class="fas fa-user-slash"></i> ${game.eliminatedPlayers.length}</span>` : '';
+            const entries = (localHistory || []).map((game, index) => ({ game, index }))
+                .filter(entry => entry.game.mode === undefined || entry.game.mode === null || entry.game.mode === 'offline');
 
-                    return `<div class="completed-game-item" data-game-index="${originalIndex}">
-                                <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} ${modeBadge}</div>
+            if (entries.length === 0) {
+                completedGamesList.innerHTML = '<div class="no-games"><i class="fas fa-folder-open"></i> No completed games yet</div>';
+                return;
+            }
+
+            completedGamesList.innerHTML = entries.slice().reverse().map(({ game, index }) => {
+                game.eliminatedPlayers = game.eliminatedPlayers || [];
+                const allParticipants = [...new Set([...(game.players || []), ...game.eliminatedPlayers])];
+                const elimCount = game.eliminatedPlayers.length ? `<span style="color: var(--danger)"><i class="fas fa-user-slash"></i> ${game.eliminatedPlayers.length}</span>` : '';
+                return `<div class="completed-game-item" data-game-index="${index}">
+                                <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
                                 <div class="game-winner"><i class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
                                 <div class="game-score"><i class="fas fa-star"></i> ${game.score} points</div>
                                 <div style="font-size: 0.8rem;">
                                 <i class="fas fa-users"></i> ${allParticipants.length} Players ${elimCount ? `(${elimCount} Eliminated)` : ''}
-                                ${game.gameId ? `<span style="font-family:monospace; font-size:0.7rem; color:var(--gray); margin-left:auto;">ID: ${escapeHtml(game.gameId.substring(0, 6))}...</span>` : ''}
                                 </div>
                             </div>`;
-                }).join('')
-                : '<div class="no-games"><i class="fas fa-folder-open"></i> No completed games yet</div>';
+            }).join('');
         }
 
         // --- Offline Mode Logic ---
@@ -2009,6 +1574,7 @@
                 players: [],
                 gameStarted: false,
                 currentRound: 1,
+                dealerIndex: 0,
                 bids: {},
                 tricks: {},
                 scores: {},
@@ -2024,7 +1590,14 @@
                 try {
                     offlineState = JSON.parse(savedState);
                     // Ensure all default keys exist for compatibility
-                     offlineState = { ...getDefaultOfflineState(), ...offlineState };
+                    offlineState = { ...getDefaultOfflineState(), ...offlineState };
+                    const totalPlayers = offlineState.players.length;
+                    if (!Number.isInteger(offlineState.dealerIndex) || totalPlayers === 0) {
+                        offlineState.dealerIndex = 0;
+                    } else {
+                        const normalizedIndex = ((offlineState.dealerIndex % totalPlayers) + totalPlayers) % totalPlayers;
+                        offlineState.dealerIndex = offlineState.players[normalizedIndex] === undefined ? 0 : normalizedIndex;
+                    }
                     console.log('Offline game state loaded.');
                 } catch (err) {
                     console.error('Error loading offline game state:', err);
@@ -2054,6 +1627,9 @@
             if (playerName && !offlineState.players.includes(playerName)) {
                 if (offlineState.players.length >= MAX_PLAYERS) { alert(`Maximum of ${MAX_PLAYERS} players allowed.`); return; }
                 offlineState.players.push(playerName);
+                if (offlineState.players.length === 1) {
+                    offlineState.dealerIndex = 0;
+                }
                 offlineState.scores[playerName] = 0; // Initialize score
                 playerNameInput.value = '';
                 saveOfflineState();
@@ -2071,6 +1647,12 @@
             delete offlineState.scores[playerToRemove];
             delete offlineState.bids[playerToRemove];
             delete offlineState.tricks[playerToRemove];
+            const remainingPlayers = offlineState.players.length;
+            if (remainingPlayers === 0) {
+                offlineState.dealerIndex = 0;
+            } else if (offlineState.dealerIndex >= remainingPlayers) {
+                offlineState.dealerIndex = remainingPlayers - 1;
+            }
             // Clear from history if needed? Maybe not for offline.
             saveOfflineState();
             renderApp();
@@ -2080,6 +1662,7 @@
             if (offlineState.players.length < 2) { alert("Need at least 2 players."); return; }
             offlineState.gameStarted = true;
             offlineState.currentRound = 1;
+            offlineState.dealerIndex = 0;
             offlineState.bidPhase = true;
             offlineState.bids = {};
             offlineState.tricks = {};
@@ -2129,8 +1712,23 @@
                 tricks: offlineState.tricks,
                 scores: offlineState.scores,
                 bidPhase: offlineState.bidPhase,
-                eliminatedPlayers: [...offlineState.eliminatedPlayers]
+                eliminatedPlayers: [...offlineState.eliminatedPlayers],
+                players: [...offlineState.players],
+                dealerIndex: offlineState.dealerIndex
              })));
+
+            const activePlayersBefore = [...offlineState.players];
+            const totalBefore = activePlayersBefore.length;
+            const dealerIndexBefore = (totalBefore > 0 && Number.isInteger(offlineState.dealerIndex))
+                ? ((offlineState.dealerIndex % totalBefore) + totalBefore) % totalBefore
+                : 0;
+            const currentDealerName = totalBefore > 0 ? activePlayersBefore[dealerIndexBefore] : null;
+            const dealerRotationCandidates = [];
+            if (totalBefore > 1) {
+                for (let offset = 1; offset < totalBefore; offset++) {
+                    dealerRotationCandidates.push(activePlayersBefore[(dealerIndexBefore + offset) % totalBefore]);
+                }
+            }
 
              // Calculate scores
              let newEliminatedPlayer = null;
@@ -2146,20 +1744,44 @@
              if (offlineState.currentRound < 14) {
                  offlineState.currentRound++;
                  offlineState.bidPhase = true;
-                 offlineState.bids = {}; // Reset bids/tricks for next round
-                 offlineState.tricks = {};
-                 offlineState.players.forEach(p => { offlineState.bids[p] = undefined; offlineState.tricks[p] = undefined; });
 
                  newEliminatedPlayer = checkElimination(offlineState); // Check for elimination
                  if (newEliminatedPlayer) {
                      offlineState.eliminatedPlayers.push(newEliminatedPlayer);
                      offlineState.players = offlineState.players.filter(p => p !== newEliminatedPlayer);
                  }
+                 const playersAfterElimination = offlineState.players;
+
+                 offlineState.bids = {}; // Reset bids/tricks for next round
+                 offlineState.tricks = {};
+                 playersAfterElimination.forEach(p => { offlineState.bids[p] = undefined; offlineState.tricks[p] = undefined; });
+
+                 if (playersAfterElimination.length > 0) {
+                     let nextDealerName = null;
+                     for (const candidate of dealerRotationCandidates) {
+                         if (playersAfterElimination.includes(candidate)) {
+                             nextDealerName = candidate;
+                             break;
+                         }
+                     }
+                     if (!nextDealerName) {
+                         if (currentDealerName && playersAfterElimination.includes(currentDealerName)) {
+                             nextDealerName = currentDealerName;
+                         } else {
+                             nextDealerName = playersAfterElimination[0];
+                         }
+                     }
+                     const newIndex = playersAfterElimination.indexOf(nextDealerName);
+                     offlineState.dealerIndex = newIndex === -1 ? 0 : newIndex;
+                 } else {
+                     offlineState.dealerIndex = 0;
+                 }
+
                  checkUpcomingElimination(offlineState);
 
              } else {
                  offlineState.currentRound = 15; // Game over
-                 saveCompletedGameToLocal(offlineState, 'offline');
+                 saveCompletedGameToLocal(offlineState);
                  localStorage.removeItem(LOCAL_STORAGE_OFFLINE_KEY); // Clear current game state after saving history
              }
 
@@ -2190,8 +1812,19 @@
 
                     // Restore active players list based on who had scores in the previous state
                     // and remove players who were only eliminated *after* that round
-                    const previousActivePlayers = Object.keys(prevState.scores).filter(p => !prevState.eliminatedPlayers.includes(p));
-                    offlineState.players = previousActivePlayers;
+                    const previousActivePlayers = Array.isArray(prevState.players)
+                        ? prevState.players
+                        : Object.keys(prevState.scores).filter(p => !prevState.eliminatedPlayers.includes(p));
+                    offlineState.players = [...previousActivePlayers];
+
+                    if (Number.isInteger(prevState.dealerIndex)) {
+                        const count = offlineState.players.length;
+                        offlineState.dealerIndex = count > 0
+                            ? ((prevState.dealerIndex % count) + count) % count
+                            : 0;
+                    } else {
+                        offlineState.dealerIndex = 0;
+                    }
 
 
                     offlineState.bidPhase = true; // Always go back to bidding phase
@@ -2205,454 +1838,6 @@
              } else {
                  alert("No rounds to undo.");
              }
-        }
-
-        // --- Online Mode Logic ---
-
-        // Add function to generate short alphanumeric game IDs
-        function generateRandomId(length = 6) {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let id = '';
-            for (let i = 0; i < length; i++) {
-                id += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return id;
-        }
-
-        async function createOnlineGame() {
-            if (!firebaseConnected) { alert("Not connected to Firebase."); return; }
-            setLoading(true, "Creating game...");
-
-            const initialGameState = {
-                players: [], gameStarted: false, currentRound: 1, dealerIndex: 0,
-                bids: {}, tricks: {}, scores: {}, bidPhase: true, eliminatedPlayers: [],
-                createdAt: firebase.database.ServerValue.TIMESTAMP
-            };
-
-            // Generate a unique short game ID
-            const db = firebase.database();
-            let newGameId, snapshot;
-            do {
-                newGameId = generateRandomId(6);
-                snapshot = await db.ref(`games/${newGameId}`).once('value');
-            } while (snapshot.exists());
-            const newGameRef = db.ref(`games/${newGameId}`);
-
-            newGameRef.set(initialGameState)
-                .then(() => {
-                    console.log(`Online game created with ID: ${newGameId}`);
-                    currentGameId = newGameId;
-                    currentMode = 'online-game'; // Switch mode
-                    attachGameListener(currentGameId); // Listener will handle render and hide loading
-                })
-                .catch(err => {
-                    console.error("Failed to create online game:", err);
-                    alert("Error creating game. Please try again.");
-                    setLoading(false);
-                });
-        }
-
-        function joinOnlineGame() {
-            const joinIdInput = document.getElementById('join-game-id-input');
-            const joinErrorEl = document.getElementById('join-error');
-            let gameId = joinIdInput ? joinIdInput.value.trim() : '';
-            
-            // Check if there's a game ID in the URL (from QR code scanning)
-            if (!gameId) {
-                const urlParams = new URLSearchParams(window.location.search);
-                const qrGameId = urlParams.get('game');
-                if (qrGameId) {
-                    gameId = qrGameId;
-                    // Update the input field if it exists
-                    if (joinIdInput) {
-                        joinIdInput.value = gameId;
-                    }
-                    // Clean the URL
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-            }
-            
-            if (!gameId) {
-                if (joinErrorEl) joinErrorEl.textContent = 'Please enter a Game ID';
-                return;
-            }
-
-            if (!firebaseInitialized) {
-                initializeFirebaseIfNeeded();
-                // If Firebase fails to initialize, the firebaseInitialized flag remains false
-                if (!firebaseInitialized) {
-                    if (joinErrorEl) joinErrorEl.textContent = 'Failed to initialize online services';
-                    return;
-                }
-            }
-
-            setLoading(true, 'Joining game...');
-            const database = firebase.database();
-
-            // Check if the game exists
-            database.ref(`/games/${gameId}`).once('value').then((snapshot) => {
-                if (snapshot.exists()) {
-                    currentGameId = gameId;
-                    currentMode = 'online-game'; // Set to game mode immediately
-                    onlineState = {}; // Reset local state
-                    menuBackButton.style.display = 'inline-block';
-                    attachGameListener(gameId);
-                } else {
-                    setLoading(false);
-                    if (joinErrorEl) joinErrorEl.textContent = 'Game not found. Check the Game ID and try again.';
-                }
-            }).catch(err => {
-                console.error('Error checking game existence:', err);
-                setLoading(false);
-                if (joinErrorEl) joinErrorEl.textContent = err.message || 'Error checking game. Please try again.';
-            });
-        }
-
-        function leaveOnlineGame(renderEntry = true) {
-             console.log("Leaving online game:", currentGameId);
-             detachGameListener();
-             currentGameId = null;
-             onlineState = {}; // Clear cache
-             previousHtml = ''; // Force re-render if needed
-             if (renderEntry) {
-                 currentMode = 'online-entry'; // Go back to online create/join
-                 renderApp();
-             }
-        }
-
-        function attachGameListener(gameId) {
-            if (gameListenerHandle) detachGameListener();
-            if (!gameId) { console.error("Attach listener: No game ID."); return; }
-
-            console.log(`Attaching listener to game: ${gameId}`);
-            gameRef = firebase.database().ref('games').child(gameId);
-            setLoading(true, 'Loading game data...');
-
-            gameListenerHandle = gameRef.on('value', (snapshot) => {
-                if (!currentGameId || gameId !== currentGameId) {
-                    console.log(`Listener ignored for ${gameId}, current is ${currentGameId}.`);
-                    return; // Stale listener after leaving
-                }
-                setLoading(false);
-                const firebaseState = snapshot.val();
-                if (firebaseState) {
-                     // Overwrite local cache with Firebase state
-                     onlineState = {
-                         players: firebaseState.players || [],
-                         gameStarted: firebaseState.gameStarted || false,
-                         currentRound: firebaseState.currentRound || 1,
-                         dealerIndex: firebaseState.dealerIndex === undefined ? 0 : firebaseState.dealerIndex,
-                         bids: firebaseState.bids || {},
-                         tricks: firebaseState.tricks || {},
-                         scores: firebaseState.scores || {},
-                         bidPhase: firebaseState.bidPhase === undefined ? true : firebaseState.bidPhase,
-                         eliminatedPlayers: firebaseState.eliminatedPlayers || [],
-                         createdAt: firebaseState.createdAt // Keep track if needed
-                     };
-                     
-                     // Check for completed game data and save it to local history for this user
-                     if (firebaseState.completedGameData && firebaseState.completedGameData.completed) {
-                         const localGame = localHistory.find(g => g.gameId === currentGameId && g.mode === 'online');
-                         // Only save if this game hasn't been saved locally before
-                         if (!localGame) {
-                             const completedGame = {
-                                 mode: 'online',
-                                 gameId: currentGameId,
-                                 date: firebaseState.completedGameData.date,
-                                 winners: firebaseState.completedGameData.winners,
-                                 score: firebaseState.completedGameData.score,
-                                 players: firebaseState.completedGameData.players,
-                                 finalScores: firebaseState.completedGameData.finalScores,
-                                 eliminatedPlayers: firebaseState.completedGameData.eliminatedPlayers
-                             };
-                             
-                             localHistory = JSON.parse(localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY)) || [];
-                             localHistory.push(completedGame);
-                             localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(localHistory));
-                             renderCompletedGames();
-                             console.log(`Saved completed online game ${currentGameId} to local history.`);
-                         }
-                     }
-                     
-                     console.log(`Firebase data received for game ${currentGameId}`);
-                     currentMode = 'online-game'; // Ensure mode is correct
-                     
-                     // Add a small buffer delay before rendering to allow for closely timed Firebase updates
-                     // This prevents multiple renders when Firebase sends multiple updates in quick succession
-                     setTimeout(() => {
-                         throttledRender();
-                     }, FIREBASE_UPDATE_BUFFER);
-                } else {
-                     console.error("Firebase returned null value for game");
-                     alert("Game not found. It may have been deleted.");
-                     leaveOnlineGame(true);
-                }
-            }, (err) => {
-                console.error("Firebase listener error:", err);
-                setLoading(false);
-                alert(`Error receiving game updates: ${err.message}`);
-            });
-        }
-
-        function detachGameListener() {
-            if (gameRef && gameListenerHandle) {
-                console.log(`Detaching listener from game: ${currentGameId}`);
-                gameRef.off('value', gameListenerHandle);
-            }
-            gameListenerHandle = null;
-            gameRef = null;
-        }
-
-        function addPlayerOnline() {
-             if (!firebaseConnected || !gameRef || !onlineState) return;
-             if (onlineState.gameStarted) { alert("Cannot add players after game start."); return; }
-
-             const playerNameInput = document.getElementById('player-name');
-             if (!playerNameInput) return;
-             let playerName = playerNameInput.value.trim();
-             if (playerName.length > 0) playerName = playerName.charAt(0).toUpperCase() + playerName.slice(1);
-
-             const currentPlayers = onlineState.players || [];
-             if (playerName && !currentPlayers.includes(playerName)) {
-                if (currentPlayers.length >= MAX_PLAYERS) { alert(`Maximum of ${MAX_PLAYERS} players.`); return; }
-                const updatedPlayers = [...currentPlayers, playerName];
-                const updates = {};
-                updates['/players'] = updatedPlayers;
-                updates[`/scores/${playerName}`] = 0;
-                updates[`/bids/${playerName}`] = null; // Use null for Firebase empty state
-                updates[`/tricks/${playerName}`] = null;
-
-                gameRef.update(updates)
-                    .then(() => { playerNameInput.value = ''; console.log(`Player ${playerName} added online.`); })
-                    .catch(err => { console.error("Online add player failed:", err); alert("Error adding player."); });
-             } else if (currentPlayers.includes(playerName)) {
-                 alert(`Player "${escapeHtml(playerName)}" already exists!`);
-                 playerNameInput.select();
-             } else {
-                 playerNameInput.focus();
-             }
-        }
-
-        function removePlayerOnline(playerToRemove) {
-             if (!firebaseConnected || !gameRef || !onlineState) return;
-             if (onlineState.gameStarted) { alert("Cannot remove players after game start."); return; }
-
-             const currentPlayers = onlineState.players || [];
-             const updatedPlayers = currentPlayers.filter(p => p !== playerToRemove);
-             const updates = {};
-             updates['/players'] = updatedPlayers;
-             updates[`/scores/${playerToRemove}`] = null; // Remove data
-             updates[`/bids/${playerToRemove}`] = null;
-             updates[`/tricks/${playerToRemove}`] = null;
-
-             // Adjust dealer index carefully
-             let newDealerIndex = onlineState.dealerIndex;
-             const removedPlayerIndex = currentPlayers.indexOf(playerToRemove);
-             if (removedPlayerIndex !== -1 && removedPlayerIndex < newDealerIndex) newDealerIndex--;
-             newDealerIndex = updatedPlayers.length > 0 ? Math.max(0, newDealerIndex) % updatedPlayers.length : 0;
-             updates['/dealerIndex'] = newDealerIndex;
-
-             gameRef.update(updates)
-                .then(() => console.log(`Player ${playerToRemove} removed online.`))
-                .catch(err => { console.error("Online remove player failed:", err); alert("Error removing player."); });
-        }
-
-        function startGameOnline() {
-            if (!firebaseConnected || !gameRef || !onlineState) return;
-            if ((onlineState.players || []).length < 2) { alert("Need at least 2 players."); return; }
-
-            const initialScores = {};
-            const initialBids = {};
-            const initialTricks = {};
-            (onlineState.players || []).forEach(p => {
-                initialScores[p] = 0; initialBids[p] = null; initialTricks[p] = null;
-            });
-
-            const updates = {
-                gameStarted: true, currentRound: 1, dealerIndex: 0, bidPhase: true,
-                scores: initialScores, bids: initialBids, tricks: initialTricks, eliminatedPlayers: [],
-            };
-
-            gameRef.update(updates)
-                .then(() => console.log(`Online game ${currentGameId} started.`))
-                .catch(err => { console.error("Online start game failed:", err); alert("Error starting game."); });
-        }
-
-        function submitBidsOnline() {
-             if (!firebaseConnected || !gameRef || !onlineState) return;
-             if (!allBidsEntered(onlineState)) { alert("Invalid bids. Check totals and ensure all players have bid."); return; }
-
-             const updates = {};
-             updates['/bidPhase'] = false;
-             // Remove this line: updates['/tricks'] = {}; // Clear tricks node
-             (onlineState.players || []).forEach(p => updates[`/tricks/${p}`] = null); // Set each player's trick to null
-
-             gameRef.update(updates)
-                .then(() => console.log("Online bids submitted."))
-                .catch(err => { console.error("Online submit bids failed:", err); alert("Error submitting bids."); });
-        }
-
-        function submitRoundResultsOnline() {
-            if (!firebaseConnected || !gameRef || !onlineState) return;
-            if (!allTricksEntered(onlineState)) { alert("All tricks must be entered."); return; }
-
-            const activePlayers = [...(onlineState.players || [])];
-            if (activePlayers.length === 0) return;
-
-            const currentScores = { ...onlineState.scores };
-            const round = onlineState.currentRound;
-
-            // Calculate scores for this round
-            activePlayers.forEach(playerName => {
-                const playerBid = onlineState.bids[playerName] || 0;
-                const playerTricks = onlineState.tricks[playerName] || 0;
-                let roundScore = 0;
-
-                if (playerBid === playerTricks) {
-                    roundScore = (playerBid === 0) ? 10 : playerTricks + (10 * playerBid);
-                } else {
-                    roundScore = playerTricks;
-                }
-
-                currentScores[playerName] = (currentScores[playerName] || 0) + roundScore;
-            });
-
-            // Prepare for next round
-            let nextRound = round;
-            let nextDealerIndex = onlineState.dealerIndex || 0;
-            let nextActivePlayers = [...activePlayers];
-            let nextEliminatedPlayers = [...(onlineState.eliminatedPlayers || [])];
-            let newEliminatedPlayer = null;
-            let gameIsOver = false;
-
-            // Prepare updates for Firebase
-            const updates = {};
-
-            if (onlineState.currentRound < 14) {
-                nextRound++;
-                nextDealerIndex = activePlayers.length > 0 ? (onlineState.dealerIndex + 1) % activePlayers.length : 0;
-
-                newEliminatedPlayer = checkElimination(currentScores, nextActivePlayers, nextRound); // Pass scores, players and next round number
-                if (newEliminatedPlayer) {
-                    // Alert locally - maybe improve this UX later
-                    alert(`Player "${escapeHtml(newEliminatedPlayer)}" eliminated! (Lowest score: ${currentScores[newEliminatedPlayer]})`);
-
-                    nextEliminatedPlayers.push(newEliminatedPlayer);
-                    nextActivePlayers = nextActivePlayers.filter(p => p !== newEliminatedPlayer);
-
-                    // Adjust dealer index for the NEW player list
-                    const originalEliminatedIndex = activePlayers.indexOf(newEliminatedPlayer);
-                    if (originalEliminatedIndex !== -1 && originalEliminatedIndex < nextDealerIndex) {
-                        nextDealerIndex--;
-                    }
-                    nextDealerIndex = nextActivePlayers.length > 0 ? Math.max(0, nextDealerIndex) % nextActivePlayers.length : 0;
-                }
-            } else {
-                nextRound = 15; // Game over
-                gameIsOver = true;
-                // Prepare final state to save to local history
-                const finalStateForHistory = {
-                    ...onlineState, // Include current bids/tricks etc.
-                    scores: currentScores, // Use the just calculated final scores
-                    players: nextActivePlayers, // Final active players
-                    eliminatedPlayers: nextEliminatedPlayers // Final eliminated players
-                };
-                saveCompletedGameToLocal(finalStateForHistory, 'online');
-                
-                // For online games that are over, store completed game information in Firebase
-                // so that all players who were in the game can access it
-                const winners = getWinners(finalStateForHistory);
-                const completedGameData = {
-                    date: new Date().toISOString(),
-                    winners: winners,
-                    score: winners.length > 0 ? (finalStateForHistory.scores[winners[0]] || 0) : 0,
-                    players: [...(finalStateForHistory.players || [])],
-                    finalScores: { ...(finalStateForHistory.scores || {}) },
-                    eliminatedPlayers: [...(finalStateForHistory.eliminatedPlayers || [])],
-                    completed: true
-                };
-                updates['/completedGameData'] = completedGameData;
-            }
-            
-            updates['/scores'] = currentScores;
-            updates['/currentRound'] = nextRound;
-            updates['/bidPhase'] = true;
-            updates['/dealerIndex'] = nextDealerIndex;
-            updates['/players'] = nextActivePlayers;
-            updates['/eliminatedPlayers'] = nextEliminatedPlayers;
-
-            // Reset bids and tricks for NEXT round (only for remaining active players)
-            const resetBids = {};
-            const resetTricks = {};
-            nextActivePlayers.forEach(p => { resetBids[p] = null; resetTricks[p] = null; });
-            // Preserve bids/tricks of previously eliminated players
-            (onlineState.eliminatedPlayers || []).forEach(p => {
-                if (onlineState.bids[p] !== undefined) resetBids[p] = onlineState.bids[p];
-                if (onlineState.tricks[p] !== undefined) resetTricks[p] = onlineState.tricks[p];
-            });
-            // Preserve bids/tricks of newly eliminated player for history, but REMOVE from next round logic
-            if (newEliminatedPlayer) {
-                // Remove from next round's bids/tricks
-                delete resetBids[newEliminatedPlayer];
-                delete resetTricks[newEliminatedPlayer];
-            }
-
-            updates['/bids'] = resetBids;
-            updates['/tricks'] = resetTricks;
-
-            gameRef.update(updates)
-                .then(() => {
-                    console.log(`Online round ${onlineState.currentRound} results submitted.`);
-                    if (gameIsOver) console.log(`Online game ${currentGameId} Over!`);
-                    // Listener will handle re-render and checkUpcomingElimination
-                })
-                .catch(err => {
-                    console.error("Online submit results failed:", err);
-                    alert("Error submitting results.");
-                });
-        }
-
-        function resetGameOnline() {
-            if (!firebaseConnected || !gameRef) return;
-            if (confirm("RESET ONLINE GAME ROOM?\n\nThis will clear scores and restart the game for EVERYONE currently in this room ID. This cannot be undone.")) {
-                // Save the current game state to local history first with reset notation
-                if (onlineState && Object.keys(onlineState).length > 0) {
-                    const finalStateForHistory = {
-                        ...onlineState,
-                        wasReset: true // Add flag to indicate this game was reset
-                    };
-                    saveCompletedGameToLocal(finalStateForHistory, 'online');
-                }
-                
-                // Delete the game from Firebase completely
-                gameRef.remove()
-                    .then(() => { 
-                        console.log(`Online game ${currentGameId} deleted from Firebase.`); 
-                        hideEliminationBanner();
-                        
-                        // Create a new game with the same ID
-                        const initialGameState = {
-                            players: [], gameStarted: false, currentRound: 1, dealerIndex: 0,
-                            bids: {}, tricks: {}, scores: {}, bidPhase: true, eliminatedPlayers: [],
-                            createdAt: firebase.database.ServerValue.TIMESTAMP
-                        };
-                        
-                        // Re-create the game with the same ID
-                        firebase.database().ref(`games/${currentGameId}`).set(initialGameState)
-                            .then(() => {
-                                console.log(`Online game ${currentGameId} reset with new state.`);
-                            })
-                            .catch(err => { 
-                                console.error("Failed to re-create game after deletion:", err); 
-                                alert("Error resetting game."); 
-                                leaveOnlineGame(true); // Go back to entry screen on failure
-                            });
-                    })
-                    .catch(err => { 
-                        console.error("Online reset/delete failed:", err); 
-                        alert("Error resetting game."); 
-                    });
-            }
         }
 
         // --- Shared Helper & Validation Functions ---
@@ -2672,30 +1857,6 @@
             console.log("Theme applied:", newTheme);
         }
 
-        function setLoading(isLoading, message = 'Loading...') {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            const loadingMessage = document.getElementById('loading-message');
-            
-            if (!loadingOverlay) return;
-            
-            if (isLoading) {
-                loadingOverlay.classList.add('active');
-                if (loadingMessage) {
-                    loadingMessage.innerHTML = message;
-                }
-            } else {
-                loadingOverlay.classList.remove('active');
-            }
-        }
-
-        function getDealerName(currentState) { // Online only helper
-            const players = currentState.players || [];
-            if (!currentState.gameStarted || players.length === 0) return null;
-            const index = currentState.dealerIndex ?? 0;
-            const adjustedIndex = Math.max(0, Math.min(index, players.length - 1));
-            return players[adjustedIndex];
-        }
-
         function calculateTotalBids(bids, players) {
             return (players || []).reduce((sum, p) => {
                 const bid = bids && bids[p];
@@ -2708,12 +1869,6 @@
                 const trick = tricks && tricks[p];
                 return sum + (trick === null || trick === undefined ? 0 : Number(trick) || 0);
             }, 0);
-        }
-
-        function calculatePotentialBidTotal(playerMakingBid, bidValue, currentState) { // Online helper
-            const potentialBids = { ...(currentState.bids || {}) };
-            potentialBids[playerMakingBid] = bidValue ?? 0; // Treat null/undefined as 0
-            return calculateTotalBids(potentialBids, currentState.players);
         }
 
         function allPlayersHaveBid(currentState) {
@@ -2773,24 +1928,10 @@
                 .map(p => p.name);
         }
 
-        function checkElimination(currentState, activePlayers, nextRound) {
-             // Handle both types of calls:
-             // 1. Single param (offline mode): currentState contains all data
-             // 2. Three params (online mode): currentState=scores object, activePlayers=players array, nextRound=round number
-             
-             let players, scores, currentRound;
-             
-             if (arguments.length === 1) {
-                 // Offline mode
-                 players = currentState.players || [];
-                 scores = currentState.scores || {};
-                 currentRound = currentState.currentRound || 1;
-             } else {
-                 // Online mode
-                 scores = currentState || {};
-                 players = activePlayers || [];
-                 currentRound = nextRound || 1;
-             }
+        function checkElimination(currentState) {
+             const players = currentState.players || [];
+             const scores = currentState.scores || {};
+             const currentRound = currentState.currentRound || 1;
 
              if (players.length * currentRound > ELIMINATION_THRESHOLD && players.length > 1) {
                  let lowestScore = Infinity;
@@ -2798,15 +1939,9 @@
 
                  const lowestPlayers = players.filter(p => (scores[p] || 0) === lowestScore);
                  if (lowestPlayers.length > 0) {
-                    // Eliminate the first player found with the lowest score
-                     const playerToEliminate = lowestPlayers[0];
-                     console.log(`Eliminating player: ${playerToEliminate} (Score: ${lowestScore}) in round ${currentRound}`);
-                     // In offline mode, this function returns the player name to be handled by the caller
-                     // In online mode, the alert happens here for simplicity, but the caller handles state update
-                     if (currentMode === 'offline') {
-                         alert(`Player "${escapeHtml(playerToEliminate)}" eliminated! (Lowest score: ${lowestScore})`);
-                     }
-                     return playerToEliminate;
+                    const playerToEliminate = lowestPlayers[0];
+                    alert(`Player "${escapeHtml(playerToEliminate)}" eliminated! (Lowest score: ${lowestScore})`);
+                    return playerToEliminate;
                  }
              }
              return null; // No elimination
@@ -2974,11 +2109,11 @@
             renderCompletedGames();
         }
 
-        function saveCompletedGameToLocal(finalState, mode) {
+        function saveCompletedGameToLocal(finalState) {
             const winners = getWinners(finalState);
             const completedGame = {
-                mode: mode, // 'offline' or 'online'
-                gameId: (mode === 'online' ? currentGameId : null), // Store online game ID
+                mode: 'offline',
+                gameId: null,
                 date: new Date().toISOString(),
                 winners: winners,
                 score: winners.length > 0 ? (finalState.scores[winners[0]] || 0) : 0,
@@ -3001,11 +2136,9 @@
             game.eliminatedPlayers = game.eliminatedPlayers || [];
             const allParticipants = [...new Set([...(game.players || []), ...game.eliminatedPlayers])];
             const sortedPlayers = getSortedPlayers(game.finalScores || {}, allParticipants);
-            const modeDisplay = game.mode === 'online' ? 'Online' : 'Offline';
 
             let content = `
-                <div class="game-date"><i class="fas fa-calendar-alt"></i> ${formattedDate} (${modeDisplay})</div>
-                ${game.gameId ? `<div style="font-size: 0.8rem; color: var(--gray); margin-bottom: 1rem;">Game ID: ${escapeHtml(game.gameId)}</div>` : ''}
+                <div class="game-date"><i class="fas fa-calendar-alt"></i> ${formattedDate}</div>
                 <div class="game-details-winners">
                 <h4>${game.winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h4>
                 <div class="winner-names">
@@ -3066,10 +2199,6 @@
 
         // --- Start the App ---
         initializeApp();
-
-        function isDealer(playerName, currentState) { // Online only helper
-             return playerName === getDealerName(currentState);
-        }
 
         // --- Hand-off QR Export/Import Logic ---
         function showHandoffQRModal() {
