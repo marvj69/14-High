@@ -804,6 +804,38 @@
 
         // --- Initialization ---
         function initializeApp() {
+            // Check for QR import via URL param
+            const urlParams = new URLSearchParams(window.location.search);
+            const importData = urlParams.get('import');
+            if (importData) {
+                try {
+                    const jsonStr = LZString.decompressFromEncodedURIComponent(importData);
+                    const parsed = JSON.parse(jsonStr);
+                    console.log('Importing game from URL:', parsed);
+
+                    if (parsed && Array.isArray(parsed.players) && typeof parsed.gameStarted === 'boolean') {
+                        const fullState = {
+                            players: parsed.players,
+                            gameStarted: parsed.gameStarted,
+                            currentRound: parsed.currentRound || 1,
+                            bids: parsed.bids || {},
+                            tricks: parsed.tricks || {},
+                            scores: parsed.scores || {},
+                            bidPhase: parsed.bidPhase !== false,
+                            eliminatedPlayers: parsed.eliminatedPlayers || [],
+                            roundHistory: []
+                        };
+                        localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, JSON.stringify(fullState));
+                        // Clear the URL param so refresh doesn't re-import
+                        window.history.replaceState({}, '', window.location.pathname);
+                        currentMode = 'offline';
+                        alert('Game imported successfully! ' + parsed.players.length + ' players, Round ' + (parsed.currentRound || 1));
+                    }
+                } catch (err) {
+                    console.error('Failed to import from URL:', err);
+                }
+            }
+
             const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
             if (savedTheme === 'dark') {
                 darkMode = true;
@@ -2233,11 +2265,20 @@
                 };
                 
                 const minimalStateStr = JSON.stringify(minimalState);
+                console.log('Hand-off QR export data:', minimalState);
                 // --- COMPRESSION ADDED HERE ---
                 const compressed = LZString.compressToEncodedURIComponent(minimalStateStr);
-                const qrData = '14HIGHZ:' + compressed;
+                // Build a URL so native camera scanner can open the app directly
+                const baseUrl = window.location.origin + window.location.pathname;
+                const qrData = baseUrl + '?import=' + compressed;
                 // --- END COMPRESSION ---
-                
+
+                // Debug: simulate decompression to verify round-trip
+                const decompressedStr = LZString.decompressFromEncodedURIComponent(compressed);
+                const decompressedData = JSON.parse(decompressedStr);
+                console.log('Hand-off QR export - URL:', qrData);
+                console.log('Hand-off QR export - decompressed:', decompressedData);
+
                 // Check size before generating QR
                 const dataSize = new Blob([qrData]).size;
                 console.log(`QR data size: ${dataSize} bytes`);
@@ -2313,10 +2354,12 @@
         }
 
         function showHandoffImportModal() {
+            console.log('showHandoffImportModal called');
             const modal = document.getElementById('handoff-import-modal');
             const closeBtn = document.getElementById('handoff-import-close');
             const statusEl = document.getElementById('handoff-import-status');
             const qrReaderDiv = document.getElementById('handoff-qr-reader');
+            console.log('Import modal elements:', { modal: !!modal, closeBtn: !!closeBtn, statusEl: !!statusEl, qrReaderDiv: !!qrReaderDiv });
             if (!modal || !qrReaderDiv) return;
             statusEl.textContent = 'Position the QR code in the frame...';
             statusEl.style.color = 'var(--gray)';
@@ -2432,25 +2475,25 @@
             
             // Start QR scanner
             setTimeout(() => {
+                console.log('Starting QR scanner, Html5Qrcode available:', typeof Html5Qrcode !== 'undefined');
                 if (typeof Html5Qrcode === 'undefined') {
                     statusEl.style.color = 'var(--danger)';
                     statusEl.textContent = 'QR scanner not available.';
                     return;
                 }
-                
+
                 html5QrCode = new Html5Qrcode("handoff-qr-reader");
+                console.log('Html5Qrcode instance created, starting camera...');
                 html5QrCode.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: 250 },
+                    { fps: 10, disableFlip: false },
                     (decodedText, decodedResult) => {
+                        console.log('QR code detected:', decodedText);
                         processImportData(decodedText, statusEl, html5QrCode, modal);
                     },
                     (errorMessage) => {
-                        // Ignore frequent scan errors, but show camera issues
-                        if (errorMessage.includes('Camera') || errorMessage.includes('Permission')) {
-                            statusEl.style.color = 'var(--warning)';
-                            statusEl.textContent = 'Camera issue: ' + errorMessage;
-                        }
+                        // Log all scan attempts (will be noisy but helpful for debugging)
+                        console.log('QR scan attempt:', errorMessage);
                     }
                 ).catch(err => {
                     statusEl.style.color = 'var(--danger)';
