@@ -75,6 +75,14 @@ Being a purely static web app, 14-High! can be deployed to any web hosting servi
 3. Try refreshing with the network disconnected to test offline mode
 4. Install to your home screen to test the full PWA experience
 
+### Regression Tests
+
+Run the large-table elimination checks with:
+
+```sh
+node tests/elimination.test.mjs
+```
+
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.

@@ -748,7 +748,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.1.0</span> <!-- Updated Version -->
+        <span>v2.3.0</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -758,10 +758,11 @@
             </button>
         </div>
         <div class="version-info">
-            <p><strong>Released:</strong> April 2025</p>
+            <p><strong>Released:</strong> May 2026</p>
             <p><strong>What's New:</strong></p>
             <ul>
                 <li><i class="fas fa-gamepad"></i> Streamlined for fast local play.</li>
+                <li><i class="fas fa-user-slash"></i> Correct large-table eliminations in offline games.</li>
                 <li><i class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
                 <li>Includes history, dark mode, and QR hand-off tools.</li>
                 <li>Author: Mark Heinonen</li>
@@ -1762,7 +1763,7 @@
             }
 
              // Calculate scores
-             let newEliminatedPlayer = null;
+             let newEliminatedPlayers = [];
              offlineState.players.forEach(player => {
                  const bid = offlineState.bids[player];
                  const tricks = offlineState.tricks[player];
@@ -1776,10 +1777,11 @@
                  offlineState.currentRound++;
                  offlineState.bidPhase = true;
 
-                 newEliminatedPlayer = checkElimination(offlineState); // Check for elimination
-                 if (newEliminatedPlayer) {
-                     offlineState.eliminatedPlayers.push(newEliminatedPlayer);
-                     offlineState.players = offlineState.players.filter(p => p !== newEliminatedPlayer);
+                 newEliminatedPlayers = checkElimination(offlineState); // Check for elimination
+                 if (newEliminatedPlayers.length > 0) {
+                     const eliminatedSet = new Set(newEliminatedPlayers);
+                     offlineState.eliminatedPlayers.push(...newEliminatedPlayers);
+                     offlineState.players = offlineState.players.filter(p => !eliminatedSet.has(p));
                  }
                  const playersAfterElimination = offlineState.players;
 
@@ -1959,53 +1961,93 @@
                 .map(p => p.name);
         }
 
-        function checkElimination(currentState) {
-             const players = currentState.players || [];
-             const scores = currentState.scores || {};
-             const currentRound = currentState.currentRound || 1;
+        function getMaxPlayersForRound(round) {
+            const numericRound = Number(round);
+            const normalizedRound = Number.isFinite(numericRound) && numericRound > 0 ? numericRound : 1;
+            return Math.max(1, Math.floor(ELIMINATION_THRESHOLD / normalizedRound));
+        }
 
-             if (players.length * currentRound > ELIMINATION_THRESHOLD && players.length > 1) {
-                 let lowestScore = Infinity;
-                 players.forEach(p => { lowestScore = Math.min(lowestScore, scores[p] || 0); });
+        function calculateEliminationPlan(currentState) {
+             const players = Array.isArray(currentState && currentState.players) ? currentState.players : [];
+             const scores = currentState && currentState.scores ? currentState.scores : {};
+             const numericRound = Number(currentState && currentState.currentRound);
+             const currentRound = Number.isFinite(numericRound) && numericRound > 0 ? numericRound : 1;
+             const maxPlayers = getMaxPlayersForRound(currentRound);
+             const excessPlayers = Math.max(0, players.length - maxPlayers);
+             const eliminateCount = Math.min(excessPlayers, Math.max(0, players.length - 1));
 
-                 const lowestPlayers = players.filter(p => (scores[p] || 0) === lowestScore);
-                 if (lowestPlayers.length > 0) {
-                    const playerToEliminate = lowestPlayers[0];
-                    alert(`Player "${escapeHtml(playerToEliminate)}" eliminated! (Lowest score: ${lowestScore})`);
-                    return playerToEliminate;
-                 }
+             if (eliminateCount === 0) {
+                return { round: currentRound, maxPlayers, count: 0, players: [] };
              }
-             return null; // No elimination
+
+             const playersToEliminate = players
+                .map((player, index) => ({
+                    player,
+                    index,
+                    score: Number(scores[player]) || 0
+                }))
+                .sort((a, b) => (a.score - b.score) || (a.index - b.index))
+                .slice(0, eliminateCount)
+                .map(entry => entry.player);
+
+             return {
+                round: currentRound,
+                maxPlayers,
+                count: playersToEliminate.length,
+                players: playersToEliminate
+             };
+        }
+
+        function getUpcomingEliminationPlan(currentState) {
+            if (!currentState || !currentState.gameStarted || currentState.currentRound > 14 || !Array.isArray(currentState.players) || currentState.players.length < 2) {
+                return null;
+            }
+
+            for (let futureRound = currentState.currentRound; futureRound <= 14; futureRound++) {
+                const futurePlan = calculateEliminationPlan({ ...currentState, currentRound: futureRound });
+                if (futurePlan.count > 0) return futurePlan;
+            }
+
+            return null;
+        }
+
+        function formatEliminatedPlayerSummary(players) {
+            const visiblePlayers = players.slice(0, 12).join(', ');
+            return players.length > 12 ? `${visiblePlayers}, and ${players.length - 12} more` : visiblePlayers;
+        }
+
+        function checkElimination(currentState) {
+             const plan = calculateEliminationPlan(currentState);
+
+             if (plan.count > 0) {
+                const plural = plan.count === 1 ? 'player' : 'players';
+                const names = formatEliminatedPlayerSummary(plan.players);
+                alert(`${plan.count} ${plural} eliminated for Round ${plan.round} (maximum ${plan.maxPlayers} active players): ${names}`);
+             }
+
+             return plan.players;
         }
 
         function checkUpcomingElimination(currentState) {
-            if (!currentState || !currentState.gameStarted || currentState.currentRound > 14 || !currentState.players || currentState.players.length < 2) {
-                hideEliminationBanner(); 
-                return;
-            }
-            
-            // Check if elimination will happen in any future round
-            let eliminationRound = null;
-            for (let futureRound = currentState.currentRound; futureRound <= 14; futureRound++) {
-                if (currentState.players.length * futureRound > ELIMINATION_THRESHOLD) {
-                    eliminationRound = futureRound;
-                    break;
-                }
-            }
-            
-            // Only update DOM if needed
-            if (eliminationRound) {
-                showEliminationBanner(eliminationRound);
+            const upcomingPlan = getUpcomingEliminationPlan(currentState);
+
+            if (upcomingPlan) {
+                showEliminationBanner(upcomingPlan);
             } else {
                 hideEliminationBanner();
             }
         }
 
-        function showEliminationBanner(round) {
+        function showEliminationBanner(elimination) {
+            const plan = typeof elimination === 'number'
+                ? { round: elimination, count: 1 }
+                : elimination;
+            const count = plan && plan.count ? plan.count : 1;
+            const plural = count === 1 ? 'elimination' : 'eliminations';
             const roundMessage = document.getElementById('round-elimination-message');
             const roundBanner = document.getElementById('round-elimination-banner');
             if (roundMessage && roundBanner) {
-                roundMessage.textContent = `Elimination at Round ${round}`;
+                roundMessage.textContent = `${count} ${plural} at Round ${plan.round}`;
                 // Always keep the element in DOM but control visibility with opacity
                 if (roundBanner.style.display === 'none') {
                     roundBanner.style.display = 'flex';

@@ -1,19 +1,19 @@
-const CACHE_NAME = '14-high-v2.2.0';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = '14-high-v2.3.0';
+const REQUIRED_ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './offline.html',
-  './icons/icon-72x72.png',
-  './icons/icon-96x96.png',
-  './icons/icon-128x128.png',
-  './icons/icon-144x144.png',
-  './icons/icon-152x152.png',
   './icons/icon-192x192.png',
-  './icons/icon-384x384.png',
   './icons/icon-512x512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css',
+];
+
+const OPTIONAL_ASSETS_TO_CACHE = [
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js',
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
 ];
 
 // Install event - cache app shell
@@ -23,7 +23,8 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[Service Worker] Caching app shell...');
-        return cache.addAll(ASSETS_TO_CACHE);
+        return cache.addAll(REQUIRED_ASSETS_TO_CACHE)
+          .then(() => Promise.allSettled(OPTIONAL_ASSETS_TO_CACHE.map(asset => cache.add(asset))));
       })
       .then(() => {
         console.log('[Service Worker] App shell cached successfully');
@@ -102,14 +103,15 @@ self.addEventListener('fetch', event => {
           })
           .catch(error => {
             console.log('[Service Worker] Fetch failed:', error);
+            const acceptHeader = event.request.headers.get('accept') || '';
             
             // For API requests or other non-HTML resources, we can return a custom response
-            if (event.request.headers.get('accept').includes('text/html')) {
+            if (acceptHeader.includes('text/html')) {
               return caches.match('/offline.html');
             }
             
             // If it's an image request, you could return a placeholder image from cache
-            if (event.request.headers.get('accept').includes('image/')) {
+            if (acceptHeader.includes('image/')) {
               return new Response('Not available while offline', {
                 status: 503,
                 statusText: 'Service Unavailable',
@@ -118,6 +120,14 @@ self.addEventListener('fetch', event => {
                 })
               });
             }
+
+            return new Response('Not available while offline', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: new Headers({
+                'Content-Type': 'text/plain'
+              })
+            });
           });
       })
   );
