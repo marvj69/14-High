@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">14-High app icon</title>
+  <desc id="desc">A polished playing-card app icon with the number 14 for the 14-High card game.</desc>
+  <defs>
+    <linearGradient id="bg" x1="74" y1="38" x2="440" y2="474" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f46e5"/>
+      <stop offset="0.52" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="card" x1="138" y1="104" x2="368" y2="421" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffaf0"/>
+      <stop offset="1" stop-color="#f8e7c8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#0f172a" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <path d="M60 104C96 84 136 73 181 70c100-8 195 30 270 112v249H60V104Z" fill="#0f172a" opacity="0.1"/>
+  <g opacity="0.18" fill="#ffffff">
+    <circle cx="82" cy="76" r="8"/>
+    <circle cx="432" cy="102" r="7"/>
+    <circle cx="456" cy="384" r="9"/>
+    <path d="M90 394l18-18 18 18-18 18z"/>
+    <path d="M392 72l15-15 15 15-15 15z"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <g transform="rotate(-13 177 260)">
+      <rect x="83" y="141" width="188" height="263" rx="25" fill="#14b8a6"/>
+      <rect x="99" y="157" width="156" height="231" rx="18" fill="none" stroke="#ecfeff" stroke-width="7" opacity="0.45"/>
+    </g>
+    <g transform="rotate(12 337 260)">
+      <rect x="244" y="138" width="188" height="263" rx="25" fill="#f59e0b"/>
+      <rect x="260" y="154" width="156" height="231" rx="18" fill="none" stroke="#fffbeb" stroke-width="7" opacity="0.48"/>
+    </g>
+    <rect x="116" y="92" width="280" height="336" rx="34" fill="url(#card)" stroke="#111827" stroke-width="9"/>
+  </g>
+
+  <g fill="#111827">
+    <text x="256" y="284" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="148" font-weight="900">14</text>
+    <text x="256" y="350" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900">HIGH</text>
+  </g>
+
+  <g fill="#ef4444">
+    <path d="M166 151c-12-19-40-5-34 17 5 21 34 38 34 38s29-17 34-38c6-22-22-36-34-17z"/>
+    <path d="M347 379c12 19 40 5 34-17-5-21-34-38-34-38s-29 17-34 38c-6 22 22 36 34 17z"/>
+  </g>
+
+  <g fill="#14b8a6">
+    <path d="M342 142l31 31-31 31-31-31z"/>
+    <path d="M170 378l31-31 31 31-31 31z"/>
+  </g>
+</svg>

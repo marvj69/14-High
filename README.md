@@ -55,10 +55,7 @@ python -m http.server 8000
 4. Visit http://localhost:8000 in your browser
 
 ### Icon Generation
-The repository includes an icon generator:
-1. Open `/generate-icons.html` in a web browser
-2. Click "Download All Icons" to get all required icon sizes
-3. Place the downloaded icons in the `/icons` directory
+The app icon source is `/icons/icon-source.svg`. Export it to the PNG sizes listed in `manifest.json` and place the generated files in `/icons`.
 
 ## Deploying
 
