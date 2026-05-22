@@ -1,4 +1,4 @@
-const CACHE_NAME = '14-high-v2.3.1';
+const CACHE_NAME = '14-high-v2.3.3';
 const REQUIRED_ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -12,14 +12,14 @@ const REQUIRED_ASSETS_TO_CACHE = [
   './icons/icon-192x192.png',
   './icons/icon-384x384.png',
   './icons/icon-512x512.png',
+  './vendor/qrcode.min.js',
+  './vendor/lz-string.min.js',
+  './vendor/html5-qrcode.min.js',
 ];
 
 const OPTIONAL_ASSETS_TO_CACHE = [
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js',
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
 ];
 
 // Install event - cache app shell
