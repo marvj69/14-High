@@ -39,6 +39,7 @@ const context = vm.createContext({
 
 vm.runInContext(`
   const MAX_PLAYERS = 56;
+  const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
   ${extractFunction('getDefaultOfflineState')}
   ${extractFunction('parseCompressedHandoffState')}
   ${extractFunction('parseHandoffImportText')}

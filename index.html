@@ -473,6 +473,77 @@
             color: var(--success-light);
         }
 
+        .handoff-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        .handoff-actions .btn-small {
+            margin: 0;
+        }
+        .handoff-payload {
+            width: 100%;
+            min-height: 4.75rem;
+            margin-top: 0.75rem;
+            padding: 0.625rem;
+            border: 1px solid var(--gray-light);
+            border-radius: var(--radius);
+            background-color: var(--light-alt);
+            color: var(--dark);
+            font-family: monospace;
+            font-size: 0.8rem;
+            resize: vertical;
+            word-break: break-all;
+        }
+        .handoff-import-controls {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--gray-light);
+        }
+        .handoff-import-controls textarea {
+            width: 100%;
+            min-height: 5.5rem;
+            padding: 0.625rem;
+            border: 1px solid var(--gray-light);
+            border-radius: var(--radius);
+            background-color: var(--light);
+            color: var(--dark);
+            font-family: monospace;
+            font-size: 0.82rem;
+            resize: vertical;
+        }
+        .handoff-import-banner {
+            display: none;
+            margin-bottom: 1rem;
+            padding: 0.75rem 0.875rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--gray-light);
+            background-color: var(--light);
+            color: var(--dark);
+            box-shadow: var(--shadow-sm);
+        }
+        .handoff-import-banner.active {
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+        .handoff-import-banner.success {
+            border-color: rgba(34, 197, 94, 0.35);
+            color: var(--success);
+        }
+        .handoff-import-banner.error {
+            border-color: rgba(239, 68, 68, 0.35);
+            color: var(--danger);
+        }
+        [data-theme="dark"] .handoff-payload,
+        [data-theme="dark"] .handoff-import-controls textarea,
+        [data-theme="dark"] .handoff-import-banner {
+            background-color: var(--gray-dark);
+            border-color: var(--gray-dark);
+        }
+
         .copy-feedback { margin-left: 0.5rem; font-size: 0.8rem; color: var(--success); opacity: 0; transition: opacity 0.3s ease; }
         .copy-feedback.visible { opacity: 1; }
         .error-message { color: var(--danger); font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 0.75rem; text-align: center; display: block; min-height: 1.2em; }
@@ -706,6 +777,7 @@
           Scan a hand-off QR code from another device.
         </div>
         <div id="handoff-qr-reader" style="width:100%;margin:0 auto;"></div>
+        <div id="handoff-paste-controls"></div>
         <div id="handoff-import-status" style="margin-top:1rem;color:var(--gray);"></div>
       </div>
     </div>
@@ -739,6 +811,7 @@
 
     <div class="container">
         <h1>14-High!</h1>
+        <div id="handoff-import-banner" class="handoff-import-banner" role="status" aria-live="polite"></div>
         <div id="app">
             <!-- Initial content: Mode Selection Screen -->
             <!-- Will be replaced by JS -->
@@ -753,7 +826,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.3.3</span> <!-- Updated Version -->
+        <span>v2.3.5</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -770,7 +843,7 @@
                 <li><i class="fas fa-user-slash"></i> Correct large-table eliminations in offline games.</li>
                 <li><i class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
                 <li>Includes history, dark mode, and QR hand-off tools.</li>
-                <li>QR hand-off links now import directly inside the app.</li>
+                <li>QR hand-off import/export now includes scan, link, and paste fallback paths.</li>
                 <li>Author: Mark Heinonen</li>
                 <li>(906) 299-2350</li>
 
@@ -784,6 +857,7 @@
         const LOCAL_STORAGE_OFFLINE_KEY = 'offlineGameState';
         const LOCAL_STORAGE_HISTORY_KEY = 'completedGames';
         const LOCAL_STORAGE_THEME_KEY = 'theme';
+        const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
 
         // --- Global State ---
         let currentMode = 'entry'; // 'entry' or 'offline'
@@ -791,6 +865,7 @@
         let localHistory = [];
         let previousHtml = ''; // Track previous HTML for diffing
         let darkMode = false;
+        let pendingImportNotice = null;
 
         // --- DOM Elements ---
         const app = document.getElementById('app');
@@ -805,6 +880,7 @@
         const versionModal = document.getElementById('version-modal');
         const versionClose = document.getElementById('version-close');
         const eliminationBanner = document.getElementById('elimination-banner');
+        const handoffImportBanner = document.getElementById('handoff-import-banner');
         const gameDetailsModal = document.getElementById('game-details-modal');
         const gameDetailsClose = document.getElementById('game-details-close');
         const gameDetailsBody = document.getElementById('game-details-body');
@@ -819,11 +895,18 @@
                     const parsed = parseCompressedHandoffState(importData);
                     const importedState = importOfflineGameState(parsed);
                     // Clear the URL param so refresh doesn't re-import
-                    window.history.replaceState({}, '', window.location.pathname);
+                    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
                     currentMode = 'offline';
-                    alert(getImportSuccessMessage(importedState));
+                    pendingImportNotice = {
+                        type: 'success',
+                        message: getImportSuccessMessage(importedState)
+                    };
                 } catch (err) {
                     console.error('Failed to import from URL:', err);
+                    pendingImportNotice = {
+                        type: 'error',
+                        message: err.message || 'Failed to import game data.'
+                    };
                 }
             }
 
@@ -838,6 +921,10 @@
 
             loadLocalHistory();
             renderApp();
+            if (pendingImportNotice) {
+                showHandoffImportNotice(pendingImportNotice.message, pendingImportNotice.type);
+                pendingImportNotice = null;
+            }
             menuBackButton.style.display = 'none';
 
             app.addEventListener('click', handleAppClick);
@@ -2264,6 +2351,87 @@
         initializeApp();
 
         // --- Hand-off QR Export/Import Logic ---
+        function showHandoffImportNotice(message, type = 'success') {
+            if (!handoffImportBanner) return;
+            const icon = type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle';
+            handoffImportBanner.className = `handoff-import-banner active ${type}`;
+            handoffImportBanner.innerHTML = `<i class="fas ${icon}"></i><span>${escapeHtml(message)}</span>`;
+            window.setTimeout(() => {
+                handoffImportBanner.classList.remove('active');
+            }, 6000);
+        }
+
+        function setHandoffStatus(statusEl, message, type = 'info') {
+            if (!statusEl) return;
+            statusEl.textContent = message;
+            if (type === 'success') {
+                statusEl.style.color = 'var(--success)';
+            } else if (type === 'error') {
+                statusEl.style.color = 'var(--danger)';
+            } else {
+                statusEl.style.color = 'var(--gray)';
+            }
+        }
+
+        function getMinimalHandoffState(fullState) {
+            return {
+                players: fullState.players || [],
+                gameStarted: fullState.gameStarted || false,
+                currentRound: fullState.currentRound || 1,
+                dealerIndex: Number.isInteger(fullState.dealerIndex) ? fullState.dealerIndex : 0,
+                bids: fullState.bids || {},
+                tricks: fullState.tricks || {},
+                scores: fullState.scores || {},
+                bidPhase: fullState.bidPhase !== false,
+                eliminatedPlayers: fullState.eliminatedPlayers || []
+            };
+        }
+
+        function buildHandoffImportUrl(compressed) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            return `${baseUrl}?import=${compressed}`;
+        }
+
+        function isLocalHandoffUrl(urlText) {
+            try {
+                const url = new URL(urlText);
+                return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+            } catch (err) {
+                return false;
+            }
+        }
+
+        function buildHandoffPayload(fullState) {
+            const minimalState = getMinimalHandoffState(fullState);
+            const minimalStateStr = JSON.stringify(minimalState);
+            const compressed = LZString.compressToEncodedURIComponent(minimalStateStr);
+            const importUrl = buildHandoffImportUrl(compressed);
+            const rawPayload = HANDOFF_COMPRESSED_PREFIX + compressed;
+
+            return {
+                minimalState,
+                compressed,
+                importUrl,
+                rawPayload,
+                importUrlSize: new Blob([importUrl]).size,
+                rawPayloadSize: new Blob([rawPayload]).size
+            };
+        }
+
+        function copyHandoffText(text, statusEl, label = 'Copied') {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                setHandoffStatus(statusEl, 'Clipboard not available. Select and copy the text manually.', 'error');
+                return;
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                setHandoffStatus(statusEl, `${label} to clipboard.`, 'success');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                setHandoffStatus(statusEl, 'Copy failed. Select and copy the text manually.', 'error');
+            });
+        }
+
         function showHandoffQRModal() {
             const modal = document.getElementById('handoff-qr-modal');
             const container = document.getElementById('handoff-qr-container');
@@ -2282,90 +2450,87 @@
             try {
                 // Parse and compress the game state for QR export
                 const fullState = JSON.parse(stateStr);
-                
-                // Create a minimal state for hand-off (remove unnecessary data)
-                const minimalState = {
-                    players: fullState.players || [],
-                    gameStarted: fullState.gameStarted || false,
-                    currentRound: fullState.currentRound || 1,
-                    dealerIndex: Number.isInteger(fullState.dealerIndex) ? fullState.dealerIndex : 0,
-                    bids: fullState.bids || {},
-                    tricks: fullState.tricks || {},
-                    scores: fullState.scores || {},
-                    bidPhase: fullState.bidPhase !== false, // default true
-                    eliminatedPlayers: fullState.eliminatedPlayers || []
-                    // Note: We're excluding roundHistory to save space
-                };
-                
-                const minimalStateStr = JSON.stringify(minimalState);
-                console.log('Hand-off QR export data:', minimalState);
-                // --- COMPRESSION ADDED HERE ---
-                const compressed = LZString.compressToEncodedURIComponent(minimalStateStr);
-                // Build a URL so native camera scanner can open the app directly
-                const baseUrl = window.location.origin + window.location.pathname;
-                const qrData = baseUrl + '?import=' + compressed;
-                // --- END COMPRESSION ---
+                const handoff = buildHandoffPayload(fullState);
+                JSON.parse(LZString.decompressFromEncodedURIComponent(handoff.compressed));
 
-                // Debug: simulate decompression to verify round-trip
-                const decompressedStr = LZString.decompressFromEncodedURIComponent(compressed);
-                const decompressedData = JSON.parse(decompressedStr);
-                console.log('Hand-off QR export - URL:', qrData);
-                console.log('Hand-off QR export - decompressed:', decompressedData);
-
-                // Check size before generating QR
-                const dataSize = new Blob([qrData]).size;
-                console.log(`QR data size: ${dataSize} bytes`);
-                
-                if (dataSize > 2900) { // Conservative limit
-                    container.innerHTML = `
-                        <div style="text-align: center; color: var(--danger); padding: 1rem;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
-                            <p><strong>Game data too large for QR code</strong></p>
-                            <p style="font-size: 0.9rem; margin-top: 0.5rem;">
-                                Data size: ${dataSize} bytes (limit: ~2900 bytes)<br>
-                                Try reducing player names or start a new game.
-                            </p>
-                            <button onclick="copyGameDataToClipboard()" style="margin-top: 1rem;" class="btn-small">
-                                <i class="fas fa-copy"></i> Copy Game Data Instead
-                            </button>
-                        </div>
+                if (handoff.importUrlSize <= 2900) {
+                    new QRCode(container, {
+                        text: handoff.importUrl,
+                        width: 250,
+                        height: 250,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.L
+                    });
+                } else {
+                    const tooLarge = document.createElement('div');
+                    tooLarge.style.color = 'var(--danger)';
+                    tooLarge.innerHTML = `
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                        <p><strong>Game data too large for a reliable QR code</strong></p>
                     `;
-                    
-                    // Add the copy function to window for the button
-                    window.copyGameDataToClipboard = function() {
-                        navigator.clipboard.writeText(qrData).then(() => {
-                            alert('Game data copied to clipboard! Share this text with the other player.');
-                        }).catch(err => {
-                            console.error('Copy failed:', err);
-                            alert('Copy failed. Please try selecting and copying the data manually.');
-                        });
-                    };
-                    
-                    modal.classList.add('active');
-                    return;
+                    container.appendChild(tooLarge);
                 }
-                
-                // Generate QR code with lower error correction for more data capacity
-                new QRCode(container, {
-                    text: qrData,
-                    width: 250,
-                    height: 250,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.L // Lower error correction = more data capacity
-                });
-                
-                // Add data size info below QR code
-                const infoDiv = document.createElement('div');
-                infoDiv.style.marginTop = '1rem';
-                infoDiv.style.fontSize = '0.8rem';
-                infoDiv.style.color = 'var(--gray)';
-                infoDiv.style.textAlign = 'center';
-                infoDiv.innerHTML = `
-                    Data size: ${dataSize} bytes<br>
-                    <span style="color: var(--success);">✓ QR code generated successfully</span>
+
+                const statusEl = document.createElement('div');
+                statusEl.style.marginTop = '0.75rem';
+                statusEl.style.fontSize = '0.82rem';
+                statusEl.style.color = 'var(--gray)';
+                statusEl.style.textAlign = 'center';
+                statusEl.innerHTML = `
+                    QR link size: ${handoff.importUrlSize} bytes<br>
+                    <span style="color: var(--success);">QR export ready</span>
                 `;
-                container.appendChild(infoDiv);
+                if (isLocalHandoffUrl(handoff.importUrl)) {
+                    statusEl.innerHTML += `<br><span style="color: var(--warning);">This local link only opens on this device. On iPhone, open the app first, then use Import from QR or paste the import data.</span>`;
+                }
+                container.appendChild(statusEl);
+
+                const actions = document.createElement('div');
+                actions.className = 'handoff-actions';
+
+                const copyLinkBtn = document.createElement('button');
+                copyLinkBtn.type = 'button';
+                copyLinkBtn.className = 'btn-small';
+                copyLinkBtn.innerHTML = '<i class="fas fa-link"></i> Copy Link';
+                copyLinkBtn.addEventListener('click', () => copyHandoffText(handoff.importUrl, statusEl, 'Import link'));
+                actions.appendChild(copyLinkBtn);
+
+                const copyPayloadBtn = document.createElement('button');
+                copyPayloadBtn.type = 'button';
+                copyPayloadBtn.className = 'btn-small';
+                copyPayloadBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Import Data';
+                copyPayloadBtn.addEventListener('click', () => copyHandoffText(handoff.rawPayload, statusEl, 'Import data'));
+                actions.appendChild(copyPayloadBtn);
+
+                if (navigator.share) {
+                    const shareBtn = document.createElement('button');
+                    shareBtn.type = 'button';
+                    shareBtn.className = 'btn-small';
+                    shareBtn.innerHTML = '<i class="fas fa-share-alt"></i> Share';
+                    shareBtn.addEventListener('click', () => {
+                        navigator.share({
+                            title: '14-High game hand-off',
+                            text: 'Open this link to import the 14-High game.',
+                            url: handoff.importUrl
+                        }).catch(err => {
+                            if (err && err.name !== 'AbortError') {
+                                console.error('Share failed:', err);
+                                setHandoffStatus(statusEl, 'Share failed. Try Copy Link instead.', 'error');
+                            }
+                        });
+                    });
+                    actions.appendChild(shareBtn);
+                }
+
+                container.appendChild(actions);
+
+                const payloadText = document.createElement('textarea');
+                payloadText.className = 'handoff-payload';
+                payloadText.readOnly = true;
+                payloadText.value = handoff.rawPayload;
+                payloadText.setAttribute('aria-label', 'Raw hand-off import data');
+                container.appendChild(payloadText);
                 
             } catch (err) {
                 console.error('QR generation error:', err);
@@ -2405,8 +2570,8 @@
                 return parseCompressedHandoffState(importParam);
             }
 
-            if (text.startsWith('14HIGHZ:')) {
-                return parseCompressedHandoffState(text.slice(8));
+            if (text.startsWith(HANDOFF_COMPRESSED_PREFIX)) {
+                return parseCompressedHandoffState(text.slice(HANDOFF_COMPRESSED_PREFIX.length));
             }
 
             if (text.startsWith('14HIGH:')) {
@@ -2472,75 +2637,100 @@
             return `Game imported successfully! ${players.length} players, Round ${state.currentRound || 1}`;
         }
 
+        function finishHandoffImport(decodedText, options = {}) {
+            const { statusEl, modal, html5QrCode } = options;
+            let message;
+            try {
+                const parsed = parseHandoffImportText(decodedText);
+                const importedState = importOfflineGameState(parsed);
+                message = getImportSuccessMessage(importedState);
+                setHandoffStatus(statusEl, `${message} Loading...`, 'success');
+                showHandoffImportNotice(message, 'success');
+            } catch (err) {
+                const errorMessage = err.message || 'Failed to import game data.';
+                setHandoffStatus(statusEl, errorMessage, 'error');
+                showHandoffImportNotice(errorMessage, 'error');
+                console.error('Import error:', err);
+                return false;
+            }
+
+            const closeAndLoad = () => {
+                window.setTimeout(() => {
+                    if (modal) modal.classList.remove('active');
+                    selectMode('offline');
+                }, 500);
+            };
+
+            if (html5QrCode) {
+                try {
+                    Promise.resolve(html5QrCode.stop()).then(closeAndLoad).catch(closeAndLoad);
+                } catch (err) {
+                    closeAndLoad();
+                }
+            } else {
+                closeAndLoad();
+            }
+            return true;
+        }
+
         function showHandoffImportModal() {
-            console.log('showHandoffImportModal called');
             const modal = document.getElementById('handoff-import-modal');
             const closeBtn = document.getElementById('handoff-import-close');
             const statusEl = document.getElementById('handoff-import-status');
             const qrReaderDiv = document.getElementById('handoff-qr-reader');
-            console.log('Import modal elements:', { modal: !!modal, closeBtn: !!closeBtn, statusEl: !!statusEl, qrReaderDiv: !!qrReaderDiv });
-            if (!modal || !qrReaderDiv) return;
-            statusEl.textContent = 'Position the QR code in the frame...';
-            statusEl.style.color = 'var(--gray)';
+            const pasteControls = document.getElementById('handoff-paste-controls');
+            if (!modal || !qrReaderDiv || !pasteControls) return;
+            setHandoffStatus(statusEl, 'Position the QR code in the frame, or paste an import link/data below.');
             qrReaderDiv.innerHTML = '';
+            pasteControls.innerHTML = '';
             modal.classList.add('active');
             let html5QrCode;
-            
-            // Function to process import data (QR only)
-            function processImportData(decodedText, statusEl, html5QrCode, modal) {
-                try {
-                    const parsed = parseHandoffImportText(decodedText);
-                    const importedState = importOfflineGameState(parsed);
-                    statusEl.style.color = 'var(--success)';
-                    statusEl.textContent = `${getImportSuccessMessage(importedState)} Loading...`;
 
-                    const closeAndLoad = () => {
-                        setTimeout(() => {
-                            modal.classList.remove('active');
-                            selectMode('offline');
-                        }, 800);
-                    };
+            const controls = document.createElement('div');
+            controls.className = 'handoff-import-controls';
 
-                    if (html5QrCode) {
-                        html5QrCode.stop().then(closeAndLoad).catch(closeAndLoad);
-                    } else {
-                        closeAndLoad();
-                    }
-                } catch (err) {
-                    statusEl.style.color = 'var(--danger)';
-                    statusEl.textContent = err.message || 'Failed to import game data.';
-                    console.error('Import error:', err);
-                }
-            }
-            
-            // Start QR scanner
-            setTimeout(() => {
-                console.log('Starting QR scanner, Html5Qrcode available:', typeof Html5Qrcode !== 'undefined');
-                if (typeof Html5Qrcode === 'undefined') {
-                    statusEl.style.color = 'var(--danger)';
-                    statusEl.textContent = 'QR scanner not available.';
-                    return;
-                }
+            const pasteInput = document.createElement('textarea');
+            pasteInput.id = 'handoff-paste-input';
+            pasteInput.placeholder = 'Paste a 14-High import link or import data';
+            pasteInput.setAttribute('aria-label', 'Paste hand-off import link or data');
+            controls.appendChild(pasteInput);
 
+            const pasteActions = document.createElement('div');
+            pasteActions.className = 'handoff-actions';
+
+            const importPasteBtn = document.createElement('button');
+            importPasteBtn.type = 'button';
+            importPasteBtn.id = 'handoff-paste-import-btn';
+            importPasteBtn.className = 'btn-small';
+            importPasteBtn.innerHTML = '<i class="fas fa-file-import"></i> Import Pasted Data';
+            importPasteBtn.addEventListener('click', () => {
+                finishHandoffImport(pasteInput.value, { statusEl, modal, html5QrCode });
+            });
+            pasteActions.appendChild(importPasteBtn);
+
+            controls.appendChild(pasteActions);
+            pasteControls.appendChild(controls);
+
+            if (typeof Html5Qrcode === 'undefined') {
+                setHandoffStatus(statusEl, 'QR scanner not available. Paste an import link or import data below.', 'error');
+            } else {
                 html5QrCode = new Html5Qrcode("handoff-qr-reader");
-                console.log('Html5Qrcode instance created, starting camera...');
+                const qrbox = (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const size = Math.floor(Math.min(280, minEdge * 0.75));
+                    return { width: size, height: size };
+                };
                 html5QrCode.start(
                     { facingMode: "environment" },
-                    { fps: 10, disableFlip: false },
-                    (decodedText, decodedResult) => {
-                        console.log('QR code detected:', decodedText);
-                        processImportData(decodedText, statusEl, html5QrCode, modal);
-                    },
-                    (errorMessage) => {
-                        // Log all scan attempts (will be noisy but helpful for debugging)
-                        console.log('QR scan attempt:', errorMessage);
-                    }
+                    { fps: 10, qrbox, disableFlip: false },
+                    (decodedText) => finishHandoffImport(decodedText, { statusEl, modal, html5QrCode }),
+                    () => {}
                 ).catch(err => {
-                    statusEl.style.color = 'var(--danger)';
-                    statusEl.textContent = 'Camera error: ' + err.message;
-                    console.error('Camera error:', err);
+                    const detail = err && err.message ? err.message : String(err || 'Camera unavailable');
+                    setHandoffStatus(statusEl, `Camera unavailable: ${detail}. Paste an import link or import data below.`, 'error');
+                    console.warn('Camera unavailable:', err);
                 });
-            }, 100);
+            }
             
             // Close logic
             closeBtn.onclick = () => {
