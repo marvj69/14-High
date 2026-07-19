@@ -41,6 +41,7 @@ vm.runInContext(`
   const MAX_PLAYERS = 56;
   const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
   ${extractFunction('getDefaultOfflineState')}
+  ${extractFunction('getMinimalHandoffState')}
   ${extractFunction('parseCompressedHandoffState')}
   ${extractFunction('parseHandoffImportText')}
   ${extractFunction('getImportParamFromText')}
@@ -49,7 +50,8 @@ vm.runInContext(`
   globalThis.handoff = {
     parseCompressedHandoffState,
     parseHandoffImportText,
-    normalizeImportedGameState
+    normalizeImportedGameState,
+    getMinimalHandoffState
   };
 `, context);
 
@@ -63,7 +65,14 @@ const sampleState = {
   tricks: { Bo: 3 },
   scores: { Ann: 32, Bo: 28 },
   bidPhase: false,
-  eliminatedPlayers: ['Cy']
+  eliminatedPlayers: ['Cy'],
+  roundHistory: [{
+    currentRound: 4,
+    players: ['Ann', 'Bo'],
+    bids: { Ann: 2, Bo: 1 },
+    tricks: { Ann: 2, Bo: 2 },
+    scores: { Ann: 10, Bo: 12 }
+  }]
 };
 const compressed = encodeURIComponent(JSON.stringify(sampleState));
 
@@ -90,7 +99,12 @@ const compressed = encodeURIComponent(JSON.stringify(sampleState));
   assert.equal(normalized.dealerIndex, 1);
   assert.equal(normalized.bidPhase, false);
   assert.deepEqual(JSON.parse(JSON.stringify(normalized.scores)), sampleState.scores);
-  assert.deepEqual(Array.from(normalized.roundHistory), []);
+  assert.equal(JSON.stringify(normalized.roundHistory), JSON.stringify(sampleState.roundHistory));
+}
+
+{
+  const minimal = api.getMinimalHandoffState(sampleState);
+  assert.equal(JSON.stringify(minimal.roundHistory), JSON.stringify(sampleState.roundHistory));
 }
 
 {

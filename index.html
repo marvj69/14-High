@@ -521,6 +521,32 @@
         [data-theme="dark"] .player-scores-header { border-color: var(--border); color: var(--text-muted); }
         [data-theme="dark"] .player-score-item { border-color: var(--border); }
         [data-theme="dark"] .player-score-item.winner { background-color: rgba(52, 211, 153, 0.12); }
+
+        .round-history-list { display: grid; gap: 0.75rem; }
+        .round-history-item {
+            border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+            background-color: var(--light); box-shadow: var(--shadow-sm);
+        }
+        .round-history-item summary {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+            padding: 0.8rem 1rem; cursor: pointer; background-color: var(--surface-2);
+            color: var(--dark); font-weight: 700; list-style: none;
+        }
+        .round-history-item summary::-webkit-details-marker { display: none; }
+        .round-history-item summary::after {
+            content: '\f078'; font-family: 'Font Awesome 5 Free'; font-weight: 900;
+            color: var(--primary); transition: transform 0.2s ease;
+        }
+        .round-history-item[open] summary::after { transform: rotate(180deg); }
+        .round-history-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.8rem; }
+        .round-history-meta { color: var(--text-muted); font-size: 0.8rem; font-weight: 500; }
+        .round-history-item .table-container { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+        .round-history-item th, .round-history-item td { white-space: nowrap; padding: 0.68rem 0.8rem; }
+        .round-history-points { color: var(--success); font-weight: 700; }
+        .round-history-total { color: var(--primary); font-weight: 700; }
+        .round-history-empty { margin: 0; color: var(--text-muted); text-align: center; padding: 0.9rem; }
+        [data-theme="dark"] .round-history-item { background-color: var(--light); border-color: var(--border); }
+        [data-theme="dark"] .round-history-item summary { background-color: var(--gray-dark); }
     </style>
     <!-- Local QR hand-off dependencies for installed/offline PWA use -->
     <script src="vendor/qrcode.min.js"></script>
@@ -560,7 +586,7 @@
         <div class="qr-code-container" id="handoff-qr-container"></div>
         <div class="qr-code-instructions">
           Transfer your offline game to another device by scanning this QR code.<br>
-          <span style="font-size:0.85em;color:var(--gray);">Game state is compressed to fit in QR code - round history may be lost.</span>
+          <span style="font-size:0.85em;color:var(--gray);">Round history is included. Larger games may require Copy Import Data instead of QR.</span>
         </div>
       </div>
     </div>
@@ -623,7 +649,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.3.5</span> <!-- Updated Version -->
+        <span>v2.4.0</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -633,12 +659,13 @@
             </button>
         </div>
         <div class="version-info">
-            <p><strong>Released:</strong> May 2026</p>
+            <p><strong>Released:</strong> July 2026</p>
             <p><strong>What's New:</strong></p>
             <ul>
                 <li><i class="fas fa-gamepad"></i> Streamlined for fast local play.</li>
                 <li><i class="fas fa-user-slash"></i> Correct large-table eliminations in offline games.</li>
                 <li><i class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
+                <li><i class="fas fa-list-alt"></i> Review bids, hands won, and scoring for every completed round.</li>
                 <li>Includes history, dark mode, and QR hand-off tools.</li>
                 <li>QR hand-off import/export now includes scan, link, and paste fallback paths.</li>
                 <li>Author: Mark Heinonen</li>
@@ -1281,6 +1308,83 @@
              `;
         }
 
+        function calculateRoundPoints(bid, tricks) {
+            if (bid === undefined || bid === null || tricks === undefined || tricks === null) return null;
+            const numericBid = Number(bid);
+            const numericTricks = Number(tricks);
+            if (!Number.isFinite(numericBid) || !Number.isFinite(numericTricks)) return null;
+            if (numericBid !== numericTricks) return numericTricks;
+            return numericBid === 0 ? 10 : numericTricks + (10 * numericBid);
+        }
+
+        function getRoundHistoryRows(roundEntry) {
+            const entry = roundEntry && typeof roundEntry === 'object' ? roundEntry : {};
+            const bids = entry.bids && typeof entry.bids === 'object' ? entry.bids : {};
+            const tricks = entry.tricks && typeof entry.tricks === 'object' ? entry.tricks : {};
+            const scoresBefore = entry.scores && typeof entry.scores === 'object' ? entry.scores : {};
+            const players = Array.isArray(entry.players) && entry.players.length > 0
+                ? entry.players
+                : [...new Set([...Object.keys(bids), ...Object.keys(tricks), ...Object.keys(scoresBefore)])];
+
+            return players.map(player => {
+                const points = calculateRoundPoints(bids[player], tricks[player]);
+                const scoreBefore = Number(scoresBefore[player]) || 0;
+                return {
+                    player,
+                    bid: bids[player],
+                    tricks: tricks[player],
+                    points,
+                    totalScore: scoreBefore + (points === null ? 0 : points)
+                };
+            });
+        }
+
+        function renderRoundHistory(roundHistory, emptyMessage = 'No completed rounds yet.') {
+            const rounds = Array.isArray(roundHistory) ? roundHistory : [];
+            if (rounds.length === 0) {
+                return `<p class="round-history-empty"><i class="fas fa-info-circle"></i> ${escapeHtml(emptyMessage)}</p>`;
+            }
+
+            return `<div class="round-history-list">
+                ${rounds.map((roundEntry, index) => {
+                    const numericRound = Number(roundEntry && roundEntry.currentRound);
+                    const roundNumber = Number.isFinite(numericRound) ? Math.max(1, Math.trunc(numericRound)) : index + 1;
+                    const rows = getRoundHistoryRows(roundEntry);
+                    const totalBids = rows.reduce((total, row) => total + (Number(row.bid) || 0), 0);
+                    const dealerIndex = Number.isInteger(roundEntry && roundEntry.dealerIndex) ? roundEntry.dealerIndex : -1;
+                    const dealerName = dealerIndex >= 0 && Array.isArray(roundEntry.players) ? roundEntry.players[dealerIndex] : null;
+                    const openAttribute = index === rounds.length - 1 ? ' open' : '';
+                    return `
+                        <details class="round-history-item"${openAttribute}>
+                            <summary>
+                                <span class="round-history-summary">
+                                    <span><i class="fas fa-layer-group"></i> Round ${roundNumber}</span>
+                                    <span class="round-history-meta">${dealerName ? `Dealer: ${escapeHtml(dealerName)} · ` : ''}Total bids: ${totalBids}</span>
+                                </span>
+                            </summary>
+                            <div class="table-container">
+                                <table>
+                                    <thead><tr><th>Player</th><th>Bid</th><th>Won</th><th>Round</th><th>Total</th></tr></thead>
+                                    <tbody>
+                                        ${rows.map(row => `
+                                            <tr>
+                                                <td>${escapeHtml(row.player)}</td>
+                                                <td>${row.bid === undefined || row.bid === null ? '-' : escapeHtml(row.bid)}</td>
+                                                <td>${row.tricks === undefined || row.tricks === null ? '-' : escapeHtml(row.tricks)}</td>
+                                                <td class="round-history-points">${row.points === null ? '-' : `+${row.points}`}</td>
+                                                <td class="round-history-total">${row.totalScore}</td>
+                                            </tr>
+                                        `).join('')}
+                                        ${rows.length === 0 ? '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No player details saved for this round.</td></tr>' : ''}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    `;
+                }).join('')}
+            </div>`;
+        }
+
         function renderGameplay(currentState) {
             // Offline gameplay UI
             let gameplayHtml = '';
@@ -1441,6 +1545,14 @@
                     </tbody>
                     </table>
                 </div>
+                </div>
+
+                <div class="card">
+                <h2><i class="fas fa-history"></i> Round History</h2>
+                ${renderRoundHistory(
+                    currentState.roundHistory,
+                    'Finish a round to see its bids, hands won, and scoring here.'
+                )}
                 </div>
 
                 ${currentRound <= 14 ? `
@@ -2077,6 +2189,7 @@
                 players: [...(finalState.players || [])], // Active players at end
                 finalScores: { ...(finalState.scores || {}) },
                 eliminatedPlayers: [...(finalState.eliminatedPlayers || [])],
+                roundHistory: JSON.parse(JSON.stringify(finalState.roundHistory || [])),
                 wasReset: finalState.wasReset || false // Include reset flag if it exists
             };
             localHistory = JSON.parse(localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY)) || [];
@@ -2118,7 +2231,14 @@
                     <span class="player-score-value">${playerScore}</span>
                 </div>`;
             });
-            content += `</div></div>`;
+            content += `</div></div>
+                <div style="margin-top: 1.5rem;">
+                    <h4><i class="fas fa-history"></i> Round History</h4>
+                    ${renderRoundHistory(
+                        game.roundHistory,
+                        'Round-by-round details were not saved for this older game.'
+                    )}
+                </div>`;
             gameDetailsBody.innerHTML = content;
             gameDetailsModal.classList.add('active');
         }
@@ -2190,7 +2310,8 @@
                 tricks: fullState.tricks || {},
                 scores: fullState.scores || {},
                 bidPhase: fullState.bidPhase !== false,
-                eliminatedPlayers: fullState.eliminatedPlayers || []
+                eliminatedPlayers: fullState.eliminatedPlayers || [],
+                roundHistory: Array.isArray(fullState.roundHistory) ? fullState.roundHistory : []
             };
         }
 
@@ -2259,8 +2380,9 @@
                 const fullState = JSON.parse(stateStr);
                 const handoff = buildHandoffPayload(fullState);
                 JSON.parse(LZString.decompressFromEncodedURIComponent(handoff.compressed));
+                const qrAvailable = handoff.importUrlSize <= 2900;
 
-                if (handoff.importUrlSize <= 2900) {
+                if (qrAvailable) {
                     new QRCode(container, {
                         text: handoff.importUrl,
                         width: 250,
@@ -2286,7 +2408,7 @@
                 statusEl.style.textAlign = 'center';
                 statusEl.innerHTML = `
                     QR link size: ${handoff.importUrlSize} bytes<br>
-                    <span style="color: var(--success);">QR export ready</span>
+                    <span style="color: var(--${qrAvailable ? 'success' : 'warning'});">${qrAvailable ? 'QR export ready' : 'Use Copy Import Data to preserve the complete game history'}</span>
                 `;
                 if (isLocalHandoffUrl(handoff.importUrl)) {
                     statusEl.innerHTML += `<br><span style="color: var(--warning);">This local link only opens on this device. On iPhone, open the app first, then use Import from QR or paste the import data.</span>`;
@@ -2427,7 +2549,9 @@
                 scores: parsed.scores && typeof parsed.scores === 'object' ? parsed.scores : {},
                 bidPhase: parsed.bidPhase !== false,
                 eliminatedPlayers: Array.isArray(parsed.eliminatedPlayers) ? parsed.eliminatedPlayers : [],
-                roundHistory: []
+                roundHistory: Array.isArray(parsed.roundHistory)
+                    ? JSON.parse(JSON.stringify(parsed.roundHistory))
+                    : []
             };
         }
 

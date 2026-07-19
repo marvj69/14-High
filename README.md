@@ -9,7 +9,7 @@ A Progressive Web App (PWA) for keeping score in the 14-High card game.
 - Installable on mobile and desktop devices
 - Automatic game state saving
 - Dark/light mode
-- Game history tracking
+- Full round history with bids, hands won, round points, and running scores
 - Mobile-friendly design
 
 ## How to Use
@@ -19,8 +19,9 @@ A Progressive Web App (PWA) for keeping score in the 14-High card game.
 3. **Bidding Phase**: Enter each player's bid. The total bids cannot equal the current round number.
 4. **Tricks Phase**: Enter how many hands each player won. The total must equal the current round number.
 5. **Scoring**: Scores are calculated automatically after each round.
-6. **Game History**: Access previous game results from the menu.
-7. **Dark/Light Mode**: Toggle in the menu.
+6. **Round History**: Review every finished round during a game, including each bid, hands won, points earned, and running score.
+7. **Game History**: Open a completed game from the menu to review final standings and its full round-by-round history.
+8. **Dark/Light Mode**: Toggle in the menu.
 
 ## Installation on Mobile Devices
 
@@ -74,10 +75,10 @@ Being a purely static web app, 14-High! can be deployed to any web hosting servi
 
 ### Regression Tests
 
-Run the large-table elimination checks with:
+Run all regression checks with:
 
 ```sh
-node tests/elimination.test.mjs
+node --test tests/*.mjs
 ```
 
 ## License
