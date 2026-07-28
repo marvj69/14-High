@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-553V1C3J93"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-553V1C3J93', {
+            allow_google_signals: false,
+            allow_ad_personalization_signals: false
+        });
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>14-High! Offline</title>
@@ -649,7 +660,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.4.0</span> <!-- Updated Version -->
+        <span>v2.5.0</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -666,6 +677,7 @@
                 <li><i class="fas fa-user-slash"></i> Correct large-table eliminations in offline games.</li>
                 <li><i class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
                 <li><i class="fas fa-list-alt"></i> Review bids, hands won, and scoring for every completed round.</li>
+                <li><i class="fas fa-chart-line"></i> Privacy-limited usage analytics for gameplay milestones.</li>
                 <li>Includes history, dark mode, and QR hand-off tools.</li>
                 <li>QR hand-off import/export now includes scan, link, and paste fallback paths.</li>
                 <li>Author: Mark Heinonen</li>
@@ -682,6 +694,45 @@
         const LOCAL_STORAGE_HISTORY_KEY = 'completedGames';
         const LOCAL_STORAGE_THEME_KEY = 'theme';
         const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
+
+        function getSafeAnalyticsParams(params = {}) {
+            const numericKeys = new Set([
+                'player_count',
+                'round_number',
+                'round_count',
+                'eliminated_count',
+                'winner_count'
+            ]);
+            const booleanKeys = new Set(['qr_available']);
+            const allowedStringValues = {
+                transfer_method: new Set(['qr', 'copy_data']),
+                import_source: new Set(['url', 'qr', 'paste'])
+            };
+            const safeParams = {};
+
+            Object.entries(params || {}).forEach(([key, value]) => {
+                if (numericKeys.has(key) && typeof value === 'number' && Number.isFinite(value)) {
+                    safeParams[key] = value;
+                } else if (booleanKeys.has(key) && typeof value === 'boolean') {
+                    safeParams[key] = value;
+                } else if (allowedStringValues[key] && allowedStringValues[key].has(value)) {
+                    safeParams[key] = value;
+                }
+            });
+
+            return safeParams;
+        }
+
+        function trackAnalyticsEvent(eventName, params = {}) {
+            if (
+                typeof eventName !== 'string' ||
+                eventName.length > 40 ||
+                !/^[a-z][a-z0-9_]*$/.test(eventName)
+            ) return false;
+            if (typeof window.gtag !== 'function') return false;
+            window.gtag('event', eventName, getSafeAnalyticsParams(params));
+            return true;
+        }
 
         // --- Global State ---
         let currentMode = 'entry'; // 'entry' or 'offline'
@@ -733,6 +784,11 @@
                         type: 'success',
                         message: getImportSuccessMessage(importedState)
                     };
+                    trackAnalyticsEvent('handoff_imported', {
+                        import_source: 'url',
+                        player_count: importedState.players.length,
+                        round_number: importedState.currentRound
+                    });
                 } catch (err) {
                     console.error('Failed to import from URL:', err);
                     pendingImportNotice = {
@@ -1697,6 +1753,9 @@
             offlineState.eliminatedPlayers = [];
             offlineState.roundHistory = []; // Reset history
             offlineState.players.forEach(p => { offlineState.scores[p] = 0; });
+            trackAnalyticsEvent('game_started', {
+                player_count: offlineState.players.length
+            });
             saveOfflineState();
             renderApp();
             checkUpcomingElimination(offlineState);
@@ -1732,6 +1791,8 @@
             if (!allTricksEntered(offlineState) || !validateTricksTotal(offlineState)) {
                 alert("Please enter hands won for all players, and ensure the total equals the current round number."); return;
             }
+
+            const completedRoundNumber = offlineState.currentRound;
 
             // Save current state for undo
             offlineState.roundHistory.push(JSON.parse(JSON.stringify({
@@ -1814,12 +1875,34 @@
                  localStorage.removeItem(LOCAL_STORAGE_OFFLINE_KEY); // Clear current game state after saving history
              }
 
+             trackAnalyticsEvent('round_recorded', {
+                 round_number: completedRoundNumber,
+                 player_count: totalBefore,
+                 eliminated_count: newEliminatedPlayers.length
+             });
+
+             if (completedRoundNumber === 14) {
+                 const participantCount = new Set([
+                     ...(offlineState.players || []),
+                     ...(offlineState.eliminatedPlayers || [])
+                 ]).size;
+                 trackAnalyticsEvent('game_completed', {
+                     player_count: participantCount,
+                     round_count: offlineState.roundHistory.length,
+                     winner_count: getWinners(offlineState).length
+                 });
+             }
+
              saveOfflineState(); // Save potentially modified state (elimination, next round)
              renderApp();
          }
 
         function resetGameOffline() {
             if (confirm("Are you sure you want to start a new offline game? This will clear the current offline game progress.")) {
+                trackAnalyticsEvent('game_reset', {
+                    player_count: Array.isArray(offlineState.players) ? offlineState.players.length : 0,
+                    round_number: offlineState.currentRound || 1
+                });
                 offlineState = getDefaultOfflineState();
                 saveOfflineState();
                 previousHtml = ''; // Force re-render
@@ -1832,6 +1915,10 @@
              if (offlineState.roundHistory && offlineState.roundHistory.length > 0) {
                 if (confirm("Are you sure you want to undo the last round?")) {
                     const prevState = offlineState.roundHistory.pop();
+                    trackAnalyticsEvent('round_undone', {
+                        player_count: Array.isArray(prevState.players) ? prevState.players.length : 0,
+                        round_number: prevState.currentRound
+                    });
 
                     // Restore previous state values
                     offlineState.currentRound = prevState.currentRound;
@@ -2381,6 +2468,12 @@
                 const handoff = buildHandoffPayload(fullState);
                 JSON.parse(LZString.decompressFromEncodedURIComponent(handoff.compressed));
                 const qrAvailable = handoff.importUrlSize <= 2900;
+                trackAnalyticsEvent('handoff_export_opened', {
+                    transfer_method: qrAvailable ? 'qr' : 'copy_data',
+                    qr_available: qrAvailable,
+                    player_count: Array.isArray(fullState.players) ? fullState.players.length : 0,
+                    round_number: fullState.currentRound || 1
+                });
 
                 if (qrAvailable) {
                     new QRCode(container, {
@@ -2569,7 +2662,7 @@
         }
 
         function finishHandoffImport(decodedText, options = {}) {
-            const { statusEl, modal, html5QrCode } = options;
+            const { statusEl, modal, html5QrCode, source = 'paste' } = options;
             let message;
             try {
                 const parsed = parseHandoffImportText(decodedText);
@@ -2577,6 +2670,11 @@
                 message = getImportSuccessMessage(importedState);
                 setHandoffStatus(statusEl, `${message} Loading...`, 'success');
                 showHandoffImportNotice(message, 'success');
+                trackAnalyticsEvent('handoff_imported', {
+                    import_source: source,
+                    player_count: importedState.players.length,
+                    round_number: importedState.currentRound
+                });
             } catch (err) {
                 const errorMessage = err.message || 'Failed to import game data.';
                 setHandoffStatus(statusEl, errorMessage, 'error');
@@ -2635,7 +2733,7 @@
             importPasteBtn.className = 'btn-small';
             importPasteBtn.innerHTML = '<i class="fas fa-file-import"></i> Import Pasted Data';
             importPasteBtn.addEventListener('click', () => {
-                finishHandoffImport(pasteInput.value, { statusEl, modal, html5QrCode });
+                finishHandoffImport(pasteInput.value, { statusEl, modal, html5QrCode, source: 'paste' });
             });
             pasteActions.appendChild(importPasteBtn);
 
@@ -2654,7 +2752,7 @@
                 html5QrCode.start(
                     { facingMode: "environment" },
                     { fps: 10, qrbox, disableFlip: false },
-                    (decodedText) => finishHandoffImport(decodedText, { statusEl, modal, html5QrCode }),
+                    (decodedText) => finishHandoffImport(decodedText, { statusEl, modal, html5QrCode, source: 'qr' }),
                     () => {}
                 ).catch(err => {
                     const detail = err && err.message ? err.message : String(err || 'Camera unavailable');

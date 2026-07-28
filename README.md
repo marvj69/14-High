@@ -10,6 +10,7 @@ A Progressive Web App (PWA) for keeping score in the 14-High card game.
 - Automatic game state saving
 - Dark/light mode
 - Full round history with bids, hands won, round points, and running scores
+- Google Analytics usage and privacy-safe gameplay milestone tracking
 - Mobile-friendly design
 
 ## How to Use
@@ -80,6 +81,12 @@ Run all regression checks with:
 ```sh
 node --test tests/*.mjs
 ```
+
+## Analytics
+
+The production site uses Google Analytics 4 measurement ID `G-553V1C3J93`. It records page activity and privacy-limited gameplay milestones such as game starts, completed rounds, completed games, and QR hand-offs.
+
+Analytics event parameters are explicitly allowlisted. Player names, bids, hands won, scores, and saved game state are never sent. Google Signals and ad-personalization signals are disabled.
 
 ## License
 
