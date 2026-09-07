@@ -460,6 +460,9 @@
         #copy-qr-id-btn { margin-top: 0.5rem; font-size: 0.88rem; color: var(--success); border: none; background: none; cursor: pointer; transition: color 0.2s ease; padding: 0.4rem 0.8rem; border-radius: var(--radius-pill); font-weight: 600; box-shadow: none; }
         #copy-qr-id-btn:hover { color: var(--success-light); background: rgba(16, 185, 129, 0.1); }
 
+        .handoff-qr-image { width: 100%; max-width: 352px; height: auto; background: white; image-rendering: pixelated; }
+        #handoff-qr-modal .qr-code-content { max-width: 420px; }
+        #handoff-qr-reader video { width: 100%; }
         .handoff-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 0.85rem; }
         .handoff-actions .btn-small { margin: 0; }
         .handoff-payload {
@@ -596,8 +599,8 @@
         <h3><i class="fas fa-qrcode"></i> Hand-off Game (QR)</h3>
         <div class="qr-code-container" id="handoff-qr-container"></div>
         <div class="qr-code-instructions">
-          Transfer your offline game to another device by scanning this QR code.<br>
-          <span style="font-size:0.85em;color:var(--gray);">Round history is included. Larger games may require Copy Import Data instead of QR.</span>
+          On the receiving device, open 14-High and tap <strong>Import from QR</strong>. Keep its camera pointed here until the game opens inside the app.<br>
+          <span style="font-size:0.85em;color:var(--gray);">Players, scores, current round, and full round history are included. Larger games cycle through several codes automatically.</span>
         </div>
       </div>
     </div>
@@ -608,11 +611,11 @@
         <button id="handoff-import-close" class="qr-code-close" aria-label="Close import QR"><i class="fas fa-times"></i></button>
         <h3><i class="fas fa-qrcode"></i> Import Game from QR</h3>
         <div style="font-size: 0.9rem; color: var(--gray); margin-bottom: 1rem; text-align: center;">
-          Scan a hand-off QR code from another device.
+          Point the camera at the other device’s game QR code. Your game will open here automatically once all parts are scanned.
         </div>
         <div id="handoff-qr-reader" style="width:100%;margin:0 auto;"></div>
         <div id="handoff-paste-controls"></div>
-        <div id="handoff-import-status" style="margin-top:1rem;color:var(--gray);"></div>
+        <div id="handoff-import-status" role="status" aria-live="polite" style="margin-top:1rem;color:var(--gray);"></div>
       </div>
     </div>
 
@@ -660,7 +663,7 @@
 
     <!-- Version indicator -->
     <div class="version-badge" id="version-badge">
-        <span>v2.5.0</span> <!-- Updated Version -->
+        <span>v2.5.1</span> <!-- Updated Version -->
     </div>
     <div class="version-modal" id="version-modal">
         <div class="version-title">
@@ -670,7 +673,7 @@
             </button>
         </div>
         <div class="version-info">
-            <p><strong>Released:</strong> July 2026</p>
+            <p><strong>Released:</strong> September 2026</p>
             <p><strong>What's New:</strong></p>
             <ul>
                 <li><i class="fas fa-gamepad"></i> Streamlined for fast local play.</li>
@@ -679,7 +682,7 @@
                 <li><i class="fas fa-list-alt"></i> Review bids, hands won, and scoring for every completed round.</li>
                 <li><i class="fas fa-chart-line"></i> Privacy-limited usage analytics for gameplay milestones.</li>
                 <li>Includes history, dark mode, and QR hand-off tools.</li>
-                <li>QR hand-off import/export now includes scan, link, and paste fallback paths.</li>
+                <li>Clearer QR codes transfer the full game inside the app, including offline.</li>
                 <li>Author: Mark Heinonen</li>
                 <li>(906) 299-2350</li>
 
@@ -2447,13 +2450,90 @@
             });
         }
 
+        // Keep each symbol small enough to resolve on a phone screen. The checksum
+        // groups frames from the same snapshot and detects incomplete/mixed data.
+        function handoffChecksum(text) {
+            let hash = 2166136261;
+            for (let i = 0; i < text.length; i++) {
+                hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+            }
+            return (hash >>> 0).toString(16).padStart(8, '0');
+        }
+
+        function buildHandoffQRFrames(rawPayload) {
+            if (rawPayload.length <= 550) return [rawPayload];
+            const count = Math.ceil(rawPayload.length / 500);
+            if (count > 128) return [];
+            const id = handoffChecksum(rawPayload);
+            return Array.from({ length: count }, (_, index) =>
+                `14HIGHQ:1:${id}:${index + 1}:${count}:${rawPayload.slice(index * 500, (index + 1) * 500)}`);
+        }
+
+        function collectHandoffQRFrame(text, transfer) {
+            if (!text.startsWith('14HIGHQ:')) return { payload: text };
+            const match = /^14HIGHQ:1:([a-f0-9]{8}):(\d+):(\d+):([\s\S]+)$/.exec(text);
+            if (!match) throw new Error('Invalid game QR part.');
+            const [, id, indexText, countText, chunk] = match;
+            const index = Number(indexText);
+            const count = Number(countText);
+            if (count < 2 || count > 128 || index < 1 || index > count || chunk.length > 500) {
+                throw new Error('Invalid game QR part.');
+            }
+            if (transfer.id !== id || transfer.count !== count) {
+                transfer.id = id;
+                transfer.count = count;
+                transfer.parts = new Map();
+            }
+            transfer.parts.set(index, chunk);
+            if (transfer.parts.size !== count) return { received: transfer.parts.size, count };
+            const payload = Array.from({ length: count }, (_, i) => transfer.parts.get(i + 1)).join('');
+            if (handoffChecksum(payload) !== id) {
+                transfer.parts.clear();
+                throw new Error('Could not combine game QR parts. Keep scanning to try again.');
+            }
+            return { payload, received: count, count };
+        }
+
+        function renderHandoffQRCode(container, text) {
+            // qrcodejs does not draw a quiet zone. Render its matrix at whole-pixel
+            // module sizes with the required four-module white border on every side.
+            const scratch = document.createElement('div');
+            const qr = new QRCode(scratch, { text, width: 256, height: 256,
+                correctLevel: QRCode.CorrectLevel.M });
+            const matrix = qr._oQRCode;
+            const count = matrix.getModuleCount();
+            const scale = 4;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = (count + 8) * scale;
+            canvas.className = 'handoff-qr-image';
+            canvas.setAttribute('role', 'img');
+            canvas.setAttribute('aria-label', 'Game transfer QR code');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#000000';
+            for (let row = 0; row < count; row++) {
+                for (let col = 0; col < count; col++) {
+                    if (matrix.isDark(row, col)) ctx.fillRect((col + 4) * scale, (row + 4) * scale, scale, scale);
+                }
+            }
+            container.replaceChildren(canvas);
+        }
+
         function showHandoffQRModal() {
             const modal = document.getElementById('handoff-qr-modal');
             const container = document.getElementById('handoff-qr-container');
             const closeBtn = document.getElementById('handoff-qr-close');
             if (!modal || !container) return;
             container.innerHTML = '';
-            
+            let frameTimer;
+            const close = () => {
+                window.clearInterval(frameTimer);
+                modal.classList.remove('active');
+            };
+            closeBtn.onclick = close;
+            modal.onclick = e => { if (e.target === modal) close(); };
+
             // Get offline game state
             let stateStr = localStorage.getItem(LOCAL_STORAGE_OFFLINE_KEY);
             if (!stateStr) {
@@ -2467,7 +2547,8 @@
                 const fullState = JSON.parse(stateStr);
                 const handoff = buildHandoffPayload(fullState);
                 JSON.parse(LZString.decompressFromEncodedURIComponent(handoff.compressed));
-                const qrAvailable = handoff.importUrlSize <= 2900;
+                const frames = buildHandoffQRFrames(handoff.rawPayload);
+                const qrAvailable = frames.length > 0;
                 trackAnalyticsEvent('handoff_export_opened', {
                     transfer_method: qrAvailable ? 'qr' : 'copy_data',
                     qr_available: qrAvailable,
@@ -2475,36 +2556,25 @@
                     round_number: fullState.currentRound || 1
                 });
 
-                if (qrAvailable) {
-                    new QRCode(container, {
-                        text: handoff.importUrl,
-                        width: 250,
-                        height: 250,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.L
-                    });
-                } else {
-                    const tooLarge = document.createElement('div');
-                    tooLarge.style.color = 'var(--danger)';
-                    tooLarge.innerHTML = `
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
-                        <p><strong>Game data too large for a reliable QR code</strong></p>
-                    `;
-                    container.appendChild(tooLarge);
-                }
-
                 const statusEl = document.createElement('div');
-                statusEl.style.marginTop = '0.75rem';
-                statusEl.style.fontSize = '0.82rem';
-                statusEl.style.color = 'var(--gray)';
-                statusEl.style.textAlign = 'center';
-                statusEl.innerHTML = `
-                    QR link size: ${handoff.importUrlSize} bytes<br>
-                    <span style="color: var(--${qrAvailable ? 'success' : 'warning'});">${qrAvailable ? 'QR export ready' : 'Use Copy Import Data to preserve the complete game history'}</span>
-                `;
-                if (isLocalHandoffUrl(handoff.importUrl)) {
-                    statusEl.innerHTML += `<br><span style="color: var(--warning);">This local link only opens on this device. On iPhone, open the app first, then use Import from QR or paste the import data.</span>`;
+                statusEl.style.fontSize = '0.88rem';
+                statusEl.setAttribute('role', 'status');
+                if (qrAvailable) {
+                    const imageContainer = document.createElement('div');
+                    imageContainer.style.width = '100%';
+                    container.appendChild(imageContainer);
+                    let frameIndex = 0;
+                    const drawFrame = () => {
+                        renderHandoffQRCode(imageContainer, frames[frameIndex]);
+                        setHandoffStatus(statusEl, frames.length === 1
+                            ? 'Ready to scan using Import from QR in 14-High.'
+                            : `Code ${frameIndex + 1} of ${frames.length} — keep scanning until the game opens.`);
+                        frameIndex = (frameIndex + 1) % frames.length;
+                    };
+                    drawFrame();
+                    if (frames.length > 1) frameTimer = window.setInterval(drawFrame, 1800);
+                } else {
+                    setHandoffStatus(statusEl, 'This game is too large for QR. Use Copy Import Data to transfer the complete game.', 'error');
                 }
                 container.appendChild(statusEl);
 
@@ -2569,8 +2639,6 @@
             }
             
             modal.classList.add('active');
-            closeBtn.onclick = () => modal.classList.remove('active');
-            modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('active'); };
         }
 
         function parseCompressedHandoffState(compressed) {
@@ -2662,7 +2730,7 @@
         }
 
         function finishHandoffImport(decodedText, options = {}) {
-            const { statusEl, modal, html5QrCode, source = 'paste' } = options;
+            const { statusEl, modal, source = 'paste' } = options;
             let message;
             try {
                 const parsed = parseHandoffImportText(decodedText);
@@ -2683,24 +2751,16 @@
                 return false;
             }
 
-            const closeAndLoad = () => {
-                window.setTimeout(() => {
-                    if (modal) modal.classList.remove('active');
-                    selectMode('offline');
-                }, 500);
-            };
-
-            if (html5QrCode) {
-                try {
-                    Promise.resolve(html5QrCode.stop()).then(closeAndLoad).catch(closeAndLoad);
-                } catch (err) {
-                    closeAndLoad();
-                }
-            } else {
-                closeAndLoad();
-            }
+            // Apply the game immediately in this window. Camera shutdown must not
+            // block rendering or trigger navigation to a browser outside the PWA.
+            if (modal) modal.classList.remove('active');
+            selectMode('offline');
             return true;
         }
+
+        // Serialize cleanup across close/reopen, including a pending camera prompt.
+        let handoffScannerCleanup = Promise.resolve();
+        let closeHandoffScanner = null;
 
         function showHandoffImportModal() {
             const modal = document.getElementById('handoff-import-modal');
@@ -2709,69 +2769,105 @@
             const qrReaderDiv = document.getElementById('handoff-qr-reader');
             const pasteControls = document.getElementById('handoff-paste-controls');
             if (!modal || !qrReaderDiv || !pasteControls) return;
-            setHandoffStatus(statusEl, 'Position the QR code in the frame, or paste an import link/data below.');
-            qrReaderDiv.innerHTML = '';
+            if (closeHandoffScanner) closeHandoffScanner();
+            setHandoffStatus(statusEl, 'Starting camera… Allow camera access to scan inside the app.');
             pasteControls.innerHTML = '';
             modal.classList.add('active');
-            let html5QrCode;
+            let scanner;
+            let closed = false;
+            let completed = false;
+            let startPromise;
+            let stopPromise;
+            const transfer = {};
+
+            const stopScanner = () => {
+                if (!stopPromise) {
+                    stopPromise = Promise.resolve(startPromise).catch(() => {}).then(async () => {
+                        // start() resolves before the video fires "playing"; isScanning
+                        // is still false then, even though the camera is already owned.
+                        if (scanner && scanner.getState() !== Html5QrcodeScannerState.NOT_STARTED) await scanner.stop();
+                        if (scanner) scanner.clear();
+                    }).catch(err => console.warn('Camera cleanup failed:', err));
+                }
+                return stopPromise;
+            };
+            const close = () => {
+                if (closed) return;
+                closed = true;
+                modal.classList.remove('active');
+                window.removeEventListener('pagehide', close);
+                document.removeEventListener('visibilitychange', onVisibilityChange);
+                handoffScannerCleanup = stopScanner();
+                if (closeHandoffScanner === close) closeHandoffScanner = null;
+            };
+            const onVisibilityChange = () => { if (document.hidden) close(); };
+            closeHandoffScanner = close;
+            closeBtn.onclick = close;
+            modal.onclick = e => { if (e.target === modal) close(); };
+            window.addEventListener('pagehide', close);
+            document.addEventListener('visibilitychange', onVisibilityChange);
+
+            const acceptText = (text, source) => {
+                if (closed || completed) return;
+                try {
+                    const result = collectHandoffQRFrame(String(text || '').trim(), transfer);
+                    if (!result.payload) {
+                        setHandoffStatus(statusEl, `Scanned ${result.received} of ${result.count} parts. Keep the camera pointed at the codes.`, 'success');
+                        return;
+                    }
+                    completed = finishHandoffImport(result.payload, { statusEl, modal, source });
+                    if (completed) close();
+                } catch (err) {
+                    setHandoffStatus(statusEl, err.message || 'Could not read game QR code.', 'error');
+                }
+            };
 
             const controls = document.createElement('div');
             controls.className = 'handoff-import-controls';
-
             const pasteInput = document.createElement('textarea');
             pasteInput.id = 'handoff-paste-input';
             pasteInput.placeholder = 'Paste a 14-High import link or import data';
             pasteInput.setAttribute('aria-label', 'Paste hand-off import link or data');
             controls.appendChild(pasteInput);
-
-            const pasteActions = document.createElement('div');
-            pasteActions.className = 'handoff-actions';
-
             const importPasteBtn = document.createElement('button');
             importPasteBtn.type = 'button';
             importPasteBtn.id = 'handoff-paste-import-btn';
             importPasteBtn.className = 'btn-small';
-            importPasteBtn.innerHTML = '<i class="fas fa-file-import"></i> Import Pasted Data';
-            importPasteBtn.addEventListener('click', () => {
-                finishHandoffImport(pasteInput.value, { statusEl, modal, html5QrCode, source: 'paste' });
-            });
-            pasteActions.appendChild(importPasteBtn);
-
-            controls.appendChild(pasteActions);
+            importPasteBtn.textContent = 'Import Pasted Data';
+            importPasteBtn.addEventListener('click', () => acceptText(pasteInput.value, 'paste'));
+            controls.appendChild(importPasteBtn);
             pasteControls.appendChild(controls);
 
-            if (typeof Html5Qrcode === 'undefined') {
-                setHandoffStatus(statusEl, 'QR scanner not available. Paste an import link or import data below.', 'error');
-            } else {
-                html5QrCode = new Html5Qrcode("handoff-qr-reader");
-                const qrbox = (viewfinderWidth, viewfinderHeight) => {
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const size = Math.floor(Math.min(280, minEdge * 0.75));
-                    return { width: size, height: size };
-                };
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox, disableFlip: false },
-                    (decodedText) => finishHandoffImport(decodedText, { statusEl, modal, html5QrCode, source: 'qr' }),
-                    () => {}
-                ).catch(err => {
-                    const detail = err && err.message ? err.message : String(err || 'Camera unavailable');
-                    setHandoffStatus(statusEl, `Camera unavailable: ${detail}. Paste an import link or import data below.`, 'error');
-                    console.warn('Camera unavailable:', err);
-                });
-            }
-            
-            // Close logic
-            closeBtn.onclick = () => {
-                modal.classList.remove('active');
-                if (html5QrCode) html5QrCode.stop().catch(()=>{});
-            };
-            modal.onclick = (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                    if (html5QrCode) html5QrCode.stop().catch(()=>{});
+            const previousCleanup = handoffScannerCleanup;
+            startPromise = previousCleanup.then(async () => {
+                if (closed) return;
+                qrReaderDiv.innerHTML = '';
+                if (typeof Html5Qrcode === 'undefined') throw new Error('QR scanner could not load.');
+                if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+                    throw new Error('Camera access requires HTTPS and a supported browser.');
                 }
-            };
+                scanner = new Html5Qrcode('handoff-qr-reader', {
+                    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+                    useBarCodeDetectorIfSupported: false,
+                    verbose: false
+                });
+                // Scan the entire video: a cropped box cuts off dense codes when
+                // the phone is close enough to focus. Request rear-camera HD input.
+                await scanner.start({ facingMode: 'environment' }, {
+                    fps: 10,
+                    disableFlip: false,
+                    videoConstraints: { facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920 }, height: { ideal: 1080 } }
+                }, text => acceptText(text, 'qr'), () => {});
+                if (!closed && !completed) {
+                    setHandoffStatus(statusEl, 'Point the camera at the whole QR code. The game opens here automatically.');
+                }
+            }).catch(err => {
+                console.warn('Camera start failed:', err);
+                if (!closed && !completed) {
+                    setHandoffStatus(statusEl, `Camera unavailable: ${err.message || err}. Allow camera access and reopen Import from QR, or paste import data below.`, 'error');
+                }
+            });
         }
 
     </script>

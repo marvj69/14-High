@@ -1,4 +1,4 @@
-const CACHE_NAME = '14-high-v2.5.0';
+const CACHE_NAME = '14-high-v2.5.1';
 const REQUIRED_ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -66,8 +66,8 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          // If fetch fails (offline), show the offline page
-          return caches.match('/offline.html');
+          // Installed apps need the real app shell to scan/import while offline.
+          return caches.match('./index.html').then(shell => shell || caches.match('./offline.html'));
         })
     );
     return; // Skip the rest of the function

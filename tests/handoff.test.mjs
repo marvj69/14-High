@@ -37,9 +37,14 @@ const context = vm.createContext({
   }
 });
 
+vm.runInContext(readFileSync(join(__dirname, '..', 'vendor/lz-string.min.js'), 'utf8'), context);
+
 vm.runInContext(`
   const MAX_PLAYERS = 56;
   const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
+  ${extractFunction('handoffChecksum')}
+  ${extractFunction('buildHandoffQRFrames')}
+  ${extractFunction('collectHandoffQRFrame')}
   ${extractFunction('getDefaultOfflineState')}
   ${extractFunction('getMinimalHandoffState')}
   ${extractFunction('parseCompressedHandoffState')}
@@ -48,6 +53,8 @@ vm.runInContext(`
   ${extractFunction('normalizeImportedGameState')}
 
   globalThis.handoff = {
+    buildHandoffQRFrames,
+    collectHandoffQRFrame,
     parseCompressedHandoffState,
     parseHandoffImportText,
     normalizeImportedGameState,
@@ -74,10 +81,10 @@ const sampleState = {
     scores: { Ann: 10, Bo: 12 }
   }]
 };
-const compressed = encodeURIComponent(JSON.stringify(sampleState));
+const compressed = context.LZString.compressToEncodedURIComponent(JSON.stringify(sampleState));
 
 {
-  const parsed = api.parseHandoffImportText(`https://example.com/14-High/?import=${compressed}`);
+  const parsed = api.parseHandoffImportText(`https://example.com/14-High/?import=${encodeURIComponent(compressed)}`);
   assert.equal(JSON.stringify(parsed), JSON.stringify(sampleState));
 }
 
@@ -115,3 +122,33 @@ const compressed = encodeURIComponent(JSON.stringify(sampleState));
 }
 
 console.log('Handoff QR tests passed');
+
+// Use the actual bundled compressor, including Unicode player names and history.
+const largeState = { ...sampleState, players: ['Ånn 🎴', 'Bo'], roundHistory: Array.from({ length: 14 }, (_, i) => ({
+  currentRound: i + 1, players: ['Ånn 🎴', 'Bo'], bids: { 'Ånn 🎴': i % 3, Bo: i % 4 },
+  tricks: { 'Ånn 🎴': i % 2, Bo: i % 5 }, scores: { 'Ånn 🎴': i * 12, Bo: i * 7 }
+})) };
+const raw = '14HIGHZ:' + context.LZString.compressToEncodedURIComponent(JSON.stringify(largeState));
+const frames = api.buildHandoffQRFrames(raw);
+assert.ok(frames.length > 1);
+assert.ok(frames.every(frame => frame.length <= 550));
+const transfer = {};
+assert.equal(api.collectHandoffQRFrame(frames[0], transfer).received, 1);
+assert.equal(api.collectHandoffQRFrame(frames[0], transfer).received, 1, 'Duplicates do not advance progress');
+for (const frame of Array.from(frames).reverse()) {
+  const result = api.collectHandoffQRFrame(frame, transfer);
+  if (result.payload) assert.deepEqual(JSON.parse(JSON.stringify(api.parseHandoffImportText(result.payload))), largeState);
+}
+assert.equal(transfer.parts.size, frames.length);
+const corrupt = {};
+assert.throws(() => {
+  for (const frame of frames) api.collectHandoffQRFrame(frame.slice(0, -1) + '!', corrupt);
+}, /Could not combine/);
+assert.throws(() => api.collectHandoffQRFrame('14HIGHQ:1:12345678:0:2:abc', {}), /Invalid/);
+assert.throws(() => api.collectHandoffQRFrame('14HIGHQ:1:12345678:1:129:abc', {}), /Invalid/);
+assert.equal(api.buildHandoffQRFrames('x'.repeat(64001)).length, 0);
+const small = '14HIGHZ:' + compressed;
+assert.equal(api.collectHandoffQRFrame(small, {}).payload, small);
+const otherFrames = api.buildHandoffQRFrames(raw + 'different');
+api.collectHandoffQRFrame(otherFrames[0], transfer);
+assert.equal(transfer.parts.size, 1, 'A different snapshot resets incomplete transfer');

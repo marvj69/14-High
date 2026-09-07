@@ -23,6 +23,9 @@ A Progressive Web App (PWA) for keeping score in the 14-High card game.
 6. **Round History**: Review every finished round during a game, including each bid, hands won, points earned, and running score.
 7. **Game History**: Open a completed game from the menu to review final standings and its full round-by-round history.
 8. **Dark/Light Mode**: Toggle in the menu.
+9. **Transfer a Game**: On the scoring device, tap **Hand-off via QR**. On the receiving device, open the installed 14-High app and tap **Import from QR**, then allow camera access. Point it at the displayed code until the game opens automatically in the same app. Larger games cycle through several codes; keep scanning until all parts are collected. Players, dealer, bids, hands won, scores, eliminations, and round history transfer together. The imported game replaces the receiving device's current game.
+
+Use **Import from QR inside 14-High** for transfers into the installed PWA. The QR contains game data, not a browser link. Copy Import Data and paste inside the app if camera access is unavailable. Older import links and QR codes are still accepted. Copy Link/Share remain available as browser-link fallbacks. Camera scanning requires HTTPS (or localhost during development); after the app has cached, transfers also work offline.
 
 ## Installation on Mobile Devices
 
@@ -81,6 +84,16 @@ Run all regression checks with:
 ```sh
 node --test tests/*.mjs
 ```
+
+### Browser QR Regression Test
+
+With a local server running on port 8014 and Playwright/Chromium available, run:
+
+```sh
+node tests/browser/handoff.mjs
+```
+
+Set `TEST_BASE_URL` for another server, `PLAYWRIGHT_MODULE` for an existing Playwright module path, or `TEST_ARTIFACTS` for screenshot output. This test sends real generated QR images through a simulated camera video feed into the bundled decoder, checks exact game/history preservation and same-window import, then verifies camera cleanup and an offline re-import. It does not substitute a fake decoder. A physical phone camera check is still useful for focus and permission behavior on iOS/Android.
 
 ## Analytics
 
