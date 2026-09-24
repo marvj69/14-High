@@ -1,9 +1,19 @@
-const CACHE_NAME = '14-high-v2.5.1';
+// Keep APP_VERSION in sync with the version badge and the app.js?v= query in
+// index.html (tests/release.test.mjs checks this).
+const APP_VERSION = '2.6.0';
+const CACHE_NAME = `14-high-v${APP_VERSION}`;
+const APP_SHELL = './index.html';
+const OFFLINE_PAGE = './offline.html';
+// Slow networks fall back to the cached app shell after this long; the
+// network response still refreshes the cache in the background.
+const NAVIGATION_TIMEOUT_MS = 3500;
+
 const REQUIRED_ASSETS_TO_CACHE = [
   './',
-  './index.html',
+  APP_SHELL,
+  `./app.js?v=${APP_VERSION}`,
   './manifest.json',
-  './offline.html',
+  OFFLINE_PAGE,
   './icons/icon-72x72.png',
   './icons/icon-96x96.png',
   './icons/icon-128x128.png',
@@ -15,126 +25,104 @@ const REQUIRED_ASSETS_TO_CACHE = [
   './vendor/qrcode.min.js',
   './vendor/lz-string.min.js',
   './vendor/html5-qrcode.min.js',
+  './vendor/fonts/inter.css',
+  './vendor/fonts/inter-latin.woff2',
+  './vendor/fonts/inter-latin-ext.woff2',
+  './vendor/fontawesome/css/all.min.css',
+  './vendor/fontawesome/webfonts/fa-solid-900.woff2',
 ];
 
-const OPTIONAL_ASSETS_TO_CACHE = [
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-];
+const scopeURL = new URL(self.registration.scope);
+const appShellPaths = new Set([scopeURL.pathname, `${scopeURL.pathname}index.html`]);
 
-// Install event - cache app shell
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Installing Service Worker...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[Service Worker] Caching app shell...');
-        return cache.addAll(REQUIRED_ASSETS_TO_CACHE)
-          .then(() => Promise.allSettled(OPTIONAL_ASSETS_TO_CACHE.map(asset => cache.add(asset))));
-      })
-      .then(() => {
-        console.log('[Service Worker] App shell cached successfully');
-        return self.skipWaiting();
-      })
+      .then(cache => cache.addAll(REQUIRED_ASSETS_TO_CACHE))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Activating Service Worker...');
-  event.waitUntil(
-    caches.keys()
-      .then(keyList => {
-        return Promise.all(keyList.map(key => {
-          if (key !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache', key);
-            return caches.delete(key);
-          }
-        }));
-      })
-      .then(() => {
-        console.log('[Service Worker] Claiming clients...');
-        return self.clients.claim();
-      })
-  );
+  event.waitUntil((async () => {
+    if (self.registration.navigationPreload) {
+      try {
+        await self.registration.navigationPreload.enable();
+      } catch (err) {
+        // Navigation preload is an optimization only.
+      }
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
-// Fetch event - serve from cache first, then network
 self.addEventListener('fetch', event => {
-  // Handle HTML navigation requests (document requests) differently
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => {
-          // Installed apps need the real app shell to scan/import while offline.
-          return caches.match('./index.html').then(shell => shell || caches.match('./offline.html'));
-        })
-    );
-    return; // Skip the rest of the function
-  }
-  
-  // Handle all other requests
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return the response from cache
-        if (response) {
-          return response;
-        }
-        
-        // Clone the request because it's a one-time use stream
-        const fetchRequest = event.request.clone();
-        
-        // Make network request and cache the response
-        return fetch(fetchRequest)
-          .then(response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-            
-            // Clone the response because it's a one-time use stream
-            const responseToCache = response.clone();
-            
-            // Open cache and store the new response
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                // Don't cache cross-origin resources like Google Fonts and Font Awesome CSS
-                if (event.request.url.startsWith(self.location.origin)) {
-                  cache.put(event.request, responseToCache);
-                }
-              });
-            
-            return response;
-          })
-          .catch(error => {
-            console.log('[Service Worker] Fetch failed:', error);
-            const acceptHeader = event.request.headers.get('accept') || '';
-            
-            // For API requests or other non-HTML resources, we can return a custom response
-            if (acceptHeader.includes('text/html')) {
-              return caches.match('/offline.html');
-            }
-            
-            // If it's an image request, you could return a placeholder image from cache
-            if (acceptHeader.includes('image/')) {
-              return new Response('Not available while offline', {
-                status: 503,
-                statusText: 'Service Unavailable',
-                headers: new Headers({
-                  'Content-Type': 'text/plain'
-                })
-              });
-            }
+  const { request } = event;
+  if (request.method !== 'GET') return;
+  // Third-party requests (analytics) go straight to the network.
+  if (new URL(request.url).origin !== self.location.origin) return;
 
-            return new Response('Not available while offline', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: new Headers({
-                'Content-Type': 'text/plain'
-              })
-            });
-          });
-      })
-  );
-}); 
+  if (request.mode === 'navigate') {
+    const network = fetchNavigation(event);
+    event.waitUntil(network.catch(() => {}));
+    event.respondWith(respondToNavigation(network));
+    return;
+  }
+  event.respondWith(cacheFirst(event));
+});
+
+async function fetchNavigation(event) {
+  const response = (await event.preloadResponse) || await fetch(event.request);
+  if (response && response.status === 200 && response.type === 'basic' && !response.redirected &&
+      appShellPaths.has(new URL(event.request.url).pathname)) {
+    // Keep the installed app's offline shell current without delaying the page.
+    const copy = response.clone();
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, copy)));
+  }
+  return response;
+}
+
+async function respondToNavigation(network) {
+  let timer;
+  const timedOut = new Promise(resolve => { timer = setTimeout(resolve, NAVIGATION_TIMEOUT_MS, null); });
+  try {
+    const response = await Promise.race([network, timedOut]);
+    if (response) return response;
+    const shell = await caches.match(APP_SHELL, { cacheName: CACHE_NAME });
+    return shell || await network;
+  } catch (err) {
+    return (await caches.match(APP_SHELL, { cacheName: CACHE_NAME })) ||
+      (await caches.match(OFFLINE_PAGE, { cacheName: CACHE_NAME })) ||
+      Response.error();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function cacheFirst(event) {
+  const { request } = event;
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+    if (response && response.status === 200 && response.type === 'basic') {
+      event.waitUntil(cache.put(request, response.clone()));
+    }
+    return response;
+  } catch (err) {
+    const accept = request.headers.get('accept') || '';
+    if (accept.includes('text/html')) {
+      const offline = await cache.match(OFFLINE_PAGE);
+      if (offline) return offline;
+    }
+    return new Response('Not available while offline', {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'text/plain' }
+    });
+  }
+}

@@ -1,0 +1,5 @@
+# Development-only files that should not be publicly deployed
+tests
+vendor/README.md
+icons/create-placeholder-icon.html
+.DS_Store
