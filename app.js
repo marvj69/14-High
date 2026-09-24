@@ -1,12 +1,23 @@
-// Google tag (gtag.js) bootstrap; the loader script is in index.html.
+// Google tag (gtag.js). Calls queue in dataLayer; the library itself loads
+// after the page so it never competes with the app's own first-load requests.
+const GA_MEASUREMENT_ID = 'G-553V1C3J93';
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', 'G-553V1C3J93', {
+gtag('config', GA_MEASUREMENT_ID, {
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
     page_location: getAnalyticsPageLocation()
 });
+
+function loadGoogleTag() {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(script);
+}
+if (document.readyState === 'complete') loadGoogleTag();
+else window.addEventListener('load', loadGoogleTag, { once: true });
 
 // Hand-off links carry the whole game (player names, scores) in ?import=; never report it.
 function getAnalyticsPageLocation() {
@@ -801,7 +812,7 @@ function renderApp() {
     if (currentMode === 'offline') {
          updateValidationAndButtons();
          if (currentState.gameStarted && currentState.currentRound <= 14) {
-            setTimeout(() => checkUpcomingElimination(currentState), 0);
+            checkUpcomingElimination(currentState);
          }
     }
 }

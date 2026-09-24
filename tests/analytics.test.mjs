@@ -26,11 +26,10 @@ function extractFunction(name) {
   throw new Error(`Could not extract function ${name}`);
 }
 
-assert.match(
-  html,
-  /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-553V1C3J93/,
-  'Expected the production GA4 tag'
-);
+assert.match(source, /const GA_MEASUREMENT_ID = 'G-553V1C3J93';/, 'Expected the production GA4 tag');
+assert.match(source, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=\$\{GA_MEASUREMENT_ID\}/);
+assert.match(source, /page_location: getAnalyticsPageLocation\(\)/, 'The ?import= payload is never reported');
+assert.doesNotMatch(html, /googletagmanager/, 'The tag loads after the page, not from <head>');
 assert.match(source, /allow_google_signals:\s*false/);
 assert.match(source, /allow_ad_personalization_signals:\s*false/);
 

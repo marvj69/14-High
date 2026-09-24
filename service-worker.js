@@ -9,18 +9,11 @@ const OFFLINE_PAGE = './offline.html';
 const NAVIGATION_TIMEOUT_MS = 3500;
 
 const REQUIRED_ASSETS_TO_CACHE = [
-  './',
   APP_SHELL,
   `./app.js?v=${APP_VERSION}`,
   './manifest.json',
   OFFLINE_PAGE,
-  './icons/icon-72x72.png',
-  './icons/icon-96x96.png',
-  './icons/icon-128x128.png',
-  './icons/icon-144x144.png',
-  './icons/icon-152x152.png',
   './icons/icon-192x192.png',
-  './icons/icon-384x384.png',
   './icons/icon-512x512.png',
   `./vendor/qrcode.min.js?v=${APP_VERSION}`,
   `./vendor/lz-string.min.js?v=${APP_VERSION}`,

@@ -5,7 +5,7 @@ A Progressive Web App (PWA) for keeping score in the 14-High card game.
 ## Features
 
 - Track scores for the 14-High card game
-- Works offline after initial load
+- Works offline after initial load, including fonts and icons
 - Installable on mobile and desktop devices
 - Automatic game state saving
 - Dark/light mode
@@ -77,6 +77,14 @@ Being a purely static web app, 14-High! can be deployed to any web hosting servi
 3. Try refreshing with the network disconnected to test offline mode
 4. Install to your home screen to test the full PWA experience
 
+### Project Layout
+
+- `index.html` — markup and styles, plus one tiny inline script that applies the saved theme before first paint.
+- `app.js` — all application code (loaded with a `?v=` version query).
+- `service-worker.js` — offline caching.
+- `vercel.json` — security headers, including the Content-Security-Policy.
+- `vendor/` — self-hosted QR libraries and fonts (see `vendor/README.md`).
+
 ### Regression Tests
 
 Run all regression checks with:
@@ -85,13 +93,19 @@ Run all regression checks with:
 node --test tests/*.mjs
 ```
 
-### Browser QR Regression Test
+`tests/security.test.mjs` covers import validation, the size-capped decompressor, output escaping and storage failures. `tests/release.test.mjs` checks the deploy configuration: the CSP hashes, matching version numbers and the precache list.
+
+### Browser Regression Tests
 
 With a local server running on port 8014 and Playwright/Chromium available, run:
 
 ```sh
 node tests/browser/handoff.mjs
+node tests/browser/security.mjs
+node tests/browser/ui.mjs
 ```
+
+`security.mjs` feeds hostile import links, booby-trapped saves and blocked or corrupt storage to the real app. It also checks for Content-Security-Policy violations when the server applies the `vercel.json` headers (for example `vercel dev`).
 
 Set `TEST_BASE_URL` for another server, `PLAYWRIGHT_MODULE` for an existing Playwright module path, or `TEST_ARTIFACTS` for screenshot output. This test sends real generated QR images through a simulated camera video feed into the bundled decoder, checks exact game/history preservation and same-window import, then verifies camera cleanup and an offline re-import. It does not substitute a fake decoder. A physical phone camera check is still useful for focus and permission behavior on iOS/Android.
 
@@ -99,7 +113,22 @@ Set `TEST_BASE_URL` for another server, `PLAYWRIGHT_MODULE` for an existing Play
 
 The production site uses Google Analytics 4 measurement ID `G-553V1C3J93`. It records page activity and privacy-limited gameplay milestones such as game starts, completed rounds, completed games, and QR hand-offs.
 
-Analytics event parameters are explicitly allowlisted. Player names, bids, hands won, scores, and saved game state are never sent. Google Signals and ad-personalization signals are disabled.
+Analytics event parameters are explicitly allowlisted. Player names, bids, hands won, scores, and saved game state are never sent. The reported page address never includes a hand-off link's `?import=` data. Google Signals and ad-personalization signals are disabled. The Google tag loads after the page has finished loading, so it doesn't slow down the app.
+
+## Security
+
+- `vercel.json` sends a strict Content-Security-Policy: scripts only from this site and the Google tag, no `eval`, no inline event handlers, and no framing. It also sends `nosniff`, a referrer policy and a Permissions-Policy that allows only the camera.
+- Inline scripts are allowed by hash. If you change the inline script in `index.html` or `offline.html`, update its `sha256-…` value in `vercel.json`. `node --test tests/*.mjs` fails and prints the new hash if you forget. Put new code in `app.js`; don't use `onclick="…"` attributes.
+- Everything except the Google tag is self-hosted, so no third-party CDN can change the app.
+- Imported games (QR, pasted data, `?import=` links) and saved data are validated before use, and every value shown on screen is escaped.
+
+## Releasing a New Version
+
+Bump the version in all of these places. `tests/release.test.mjs` checks that they match.
+
+1. `APP_VERSION` in `service-worker.js` (this also renames the offline cache).
+2. `APP_VERSION` in `app.js`.
+3. The version badge (`<span>v…</span>`) and the `?v=` query strings in `index.html`.
 
 ## License
 

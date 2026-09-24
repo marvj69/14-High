@@ -1,8 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-553V1C3J93"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>14-High! Offline</title>
@@ -270,13 +268,13 @@
         [data-theme="dark"] .hamburger-btn, [data-theme="dark"] .menu-close { background: var(--light); border-color: var(--border); color: var(--text-muted); }
         [data-theme="dark"] .hamburger-btn:hover, [data-theme="dark"] .menu-close:hover { background: var(--gray-dark); color: var(--primary); }
         .menu-content {
-            position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background-color: var(--light);
-            box-shadow: var(--shadow-lg); transition: left 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.32s; padding: 1rem; display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; transform: translateX(-280px); width: 280px; height: 100%; background-color: var(--light);
+            box-shadow: var(--shadow-lg); transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.32s; padding: 1rem; display: flex; flex-direction: column;
             border-right: 1px solid var(--border); z-index: 1001;
             visibility: hidden; pointer-events: none;
         }
         [data-theme="dark"] .menu-content { background-color: var(--light); border-right-color: var(--border); }
-        .menu-content.active { left: 0; visibility: visible; pointer-events: auto; transition: left 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0s; }
+        .menu-content.active { transform: none; visibility: visible; pointer-events: auto; transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0s; }
         .menu-header { display: flex; justify-content: flex-end; margin-bottom: 1.25rem; padding-top: 0.25rem; }
         .menu-item-header {
             padding: 0.6rem 0; margin: 1rem 0 0.5rem 0; font-weight: 700; font-size: 0.74rem; color: var(--text-muted);
