@@ -142,6 +142,35 @@ try {
     assert.deepEqual(problems, []);
     await context.close();
   }
+  // A #import= link opened in a tab that already shows the app imports; an import that
+  // storage can't save still opens; clicking the badge then pressing Escape leaves no focus ring.
+  {
+    const { context, page, problems } = await openApp();
+    const link = await page.evaluate(async () => {
+      await loadScriptOnce(`vendor/lz-string.min.js?v=${APP_VERSION}`);
+      return buildHandoffImportUrl(LZString.compressToEncodedURIComponent(JSON.stringify({
+        players: ['Ann', 'Bo'], gameStarted: true, currentRound: 2, dealerIndex: 0, bids: {}, tricks: {},
+        scores: { Ann: 11, Bo: 0 }, bidPhase: true, eliminatedPlayers: [], roundHistory: [] })));
+    });
+    assert.match(link, /#import=/);
+    await page.goto(link);
+    await page.waitForSelector('.bid-input');
+    assert.equal(new URL(page.url()).hash, '', 'the link data is removed from the address bar');
+
+    await page.goto(baseURL);
+    await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; });
+    await page.click('#handoff-import-btn');
+    await page.fill('#handoff-paste-input', link);
+    await page.click('#handoff-paste-import-btn');
+    await page.waitForSelector('.bid-input');
+    assert.ok((await page.locator('#app').innerText()).includes('Round 2 / 14'), 'the imported game is shown');
+
+    await page.click('#version-badge');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => document.activeElement.id), '', 'no focus left on the badge');
+    assert.deepEqual(problems, []);
+    await context.close();
+  }
   console.log('PASS: typed names, dialog backdrop/Escape, bad links, single confirm, tie medals and details fade behave correctly.');
 } finally {
   await browser.close();

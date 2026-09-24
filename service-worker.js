@@ -70,9 +70,13 @@ async function fetchNavigation(event) {
   const response = (await event.preloadResponse) || await fetch(event.request);
   if (response && response.status === 200 && response.type === 'basic' && !response.redirected &&
       appShellPaths.has(new URL(event.request.url).pathname)) {
-    // Keep the installed app's offline shell current without delaying the page.
+    // Keep the installed app's offline shell current without delaying the page, but only
+    // with this release's page: a newer release needs files this cache doesn't have.
     const copy = response.clone();
-    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, copy)));
+    const probe = response.clone();
+    event.waitUntil(probe.text().then(html => html.includes(`app.js?v=${APP_VERSION}"`)
+      ? caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, copy))
+      : undefined));
   }
   return response;
 }
@@ -108,6 +112,12 @@ async function cacheFirst(event) {
     }
     return response;
   } catch (err) {
+    // After an update, a page still running the previous release may load its QR
+    // libraries (vendor/*.js?v=old) offline; serve this release's copy of the same file.
+    if (new URL(request.url).pathname.includes('/vendor/')) {
+      const sameFile = await cache.match(request, { ignoreSearch: true });
+      if (sameFile) return sameFile;
+    }
     const accept = request.headers.get('accept') || '';
     if (accept.includes('text/html')) {
       const offline = await cache.match(OFFLINE_PAGE);

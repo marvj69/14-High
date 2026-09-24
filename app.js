@@ -138,17 +138,22 @@ function normalizeDealerIndex(value, playerCount) {
     return ((value % playerCount) + playerCount) % playerCount;
 }
 
-function copyOwnFields(source) {
+function copyOwnFields(source, knownKeys) {
     const copy = {};
     Object.keys(source).forEach(key => {
-        if (!isReservedKey(key)) copy[key] = source[key];
+        if (isReservedKey(key)) return;
+        const value = source[key];
+        if (knownKeys.includes(key) || value === null || typeof value === 'boolean' || isScoreValue(value) ||
+            (typeof value === 'string' && value.length <= 200)) {
+            copy[key] = value;
+        }
     });
     return copy;
 }
 
 function sanitizeRoundEntry(entry) {
     if (!isPlainObject(entry)) return null;
-    const clean = copyOwnFields(entry);
+    const clean = copyOwnFields(entry, ['currentRound', 'players', 'eliminatedPlayers', 'dealerIndex', 'bidPhase', 'bids', 'tricks', 'scores']);
     const has = key => Object.prototype.hasOwnProperty.call(clean, key);
     ['players', 'eliminatedPlayers'].forEach(key => {
         if (!has(key)) return;
@@ -192,7 +197,7 @@ function sanitizeGameState(raw) {
 
 function sanitizeCompletedGame(game) {
     if (!isPlainObject(game)) return null;
-    const clean = copyOwnFields(game);
+    const clean = copyOwnFields(game, ['date', 'winners', 'score', 'players', 'finalScores', 'eliminatedPlayers', 'roundHistory']);
     clean.winners = sanitizePlayerNames(game.winners);
     clean.players = sanitizePlayerNames(game.players);
     clean.eliminatedPlayers = sanitizePlayerNames(game.eliminatedPlayers);
@@ -337,12 +342,13 @@ let previousHtml = ''; // Track previous HTML for diffing
 let previousRenderContext = ''; // Screen/round/phase of the previous render
 let handoffNoticeTimer; // Hides the hand-off import banner
 let pointerDownTarget = null; // Where the current click started (see isBackdropClick)
+let suppressDefaultFocus = false; // Set while re-rendering for another tab's change
 
 // A click whose press started inside a dialog (e.g. selecting pasted text and
 // releasing over the backdrop) is dispatched to the backdrop; don't treat it
 // as "click outside".
 function isBackdropClick(e, backdrop) {
-    return e.target === backdrop && (!pointerDownTarget || pointerDownTarget === backdrop);
+    return e.target === backdrop && (e.detail === 0 || !pointerDownTarget || pointerDownTarget === backdrop);
 }
 let darkMode = false;
 let pendingImportNotice = null;
@@ -459,7 +465,7 @@ function initializeApp() {
     document.addEventListener('pointerdown', (e) => { pointerDownTarget = e.target; }, true);
     document.addEventListener('click', (e) => {
         if (menuContent.classList.contains('active') && !menuContent.contains(e.target) && !hamburgerBtn.contains(e.target) &&
-            !(pointerDownTarget && menuContent.contains(pointerDownTarget))) {
+            !(e.detail > 0 && pointerDownTarget && menuContent.contains(pointerDownTarget))) {
             setMenuOpen(false);
         }
         if (versionModal.classList.contains('active') && !versionModal.contains(e.target) && !versionBadge.contains(e.target)) {
@@ -480,12 +486,23 @@ function initializeApp() {
         else if (menuContent.classList.contains('active')) setMenuOpen(false);
     });
 
+    // A hand-off link opened in a tab that already shows the app only changes the
+    // #fragment; reload so it goes through the normal import (confirm, banner, cleanup).
+    window.addEventListener('hashchange', () => {
+        if (new URLSearchParams(window.location.hash.slice(1)).has('import')) window.location.reload();
+    });
+
     // Another tab or window saved newer data; show it instead of overwriting it later.
     window.addEventListener('storage', (e) => {
         if (e.key === LOCAL_STORAGE_HISTORY_KEY) loadLocalHistory();
         if (e.key === LOCAL_STORAGE_OFFLINE_KEY && currentMode === 'offline') {
             loadOfflineState();
-            renderApp();
+            suppressDefaultFocus = true;
+            try {
+                renderApp();
+            } finally {
+                suppressDefaultFocus = false;
+            }
         }
     });
 
@@ -496,6 +513,7 @@ function initializeApp() {
     if (versionBadge) {
         versionBadge.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (e.detail > 0) versionBadge.blur();
             versionModal.classList.add('active');
         });
         versionBadge.addEventListener('keydown', (e) => {
@@ -517,6 +535,7 @@ function initializeApp() {
         completedGamesList.addEventListener('click', (e) => {
             const gameItem = e.target.closest('.completed-game-item');
             if (gameItem) {
+                if (e.detail > 0) gameItem.blur();
                 const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
                 if (!isNaN(gameIndex)) showGameDetails(gameIndex);
             }
@@ -567,11 +586,11 @@ function initializeApp() {
 }
 
 // --- Mode Selection & Switching ---
-function selectMode(mode) {
+function selectMode(mode, options = {}) {
     hideEliminationBanner();
     if (mode === 'offline') {
         currentMode = 'offline';
-        loadOfflineState();
+        if (!options.keepState) loadOfflineState();
         menuBackButton.style.display = 'block';
         renderApp();
     } else { // Go back to entry
@@ -876,6 +895,8 @@ function applyPostRenderFocus(currentState, restoreFocus = true) {
             return; // Exit early - we've restored focus
         }
     }
+
+    if (suppressDefaultFocus) return;
 
     // Default focus behavior if we can't restore previous focus
     if (currentMode === 'entry') {
@@ -1594,7 +1615,7 @@ function undoRoundOffline() {
             // and remove players who were only eliminated *after* that round
             const previousActivePlayers = Array.isArray(prevState.players)
                 ? prevState.players
-                : Object.keys(offlineState.scores).filter(p => !previousEliminated.includes(p));
+                : sanitizePlayerNames(Object.keys(offlineState.scores).filter(p => !previousEliminated.includes(p)));
             offlineState.players = [...previousActivePlayers];
 
             if (Number.isInteger(prevState.dealerIndex)) {
@@ -1922,13 +1943,13 @@ let pendingDialogFocusId = null;
 function rememberDialogOpener(closeButtonId) {
     dialogOpener = document.activeElement;
     pendingDialogFocusId = closeButtonId;
-    let frames = 0;
+    const started = performance.now();
     // The dialog may appear a little later (e.g. after its scripts load).
     const focusWhenShown = () => {
         const closeButton = pendingDialogFocusId && document.getElementById(pendingDialogFocusId);
         if (!closeButton) return;
         closeButton.focus();
-        if (document.activeElement === closeButton || ++frames > 30) pendingDialogFocusId = null;
+        if (document.activeElement === closeButton || performance.now() - started > 5000) pendingDialogFocusId = null;
         else requestAnimationFrame(focusWhenShown);
     };
     requestAnimationFrame(focusWhenShown);
@@ -2416,7 +2437,7 @@ function finishHandoffImport(decodedText, options = {}) {
     // Apply the game immediately in this window. Camera shutdown must not
     // block rendering or trigger navigation to a browser outside the PWA.
     if (modal) modal.classList.remove('active');
-    selectMode('offline');
+    selectMode('offline', { keepState: true });
     return true;
 }
 
