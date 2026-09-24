@@ -6,20 +6,21 @@ import vm from 'node:vm';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(__dirname, '..', 'index.html'), 'utf8');
+const source = readFileSync(join(__dirname, '..', 'app.js'), 'utf8');
 
 function extractFunction(name) {
-  const start = html.indexOf(`function ${name}`);
+  const start = source.indexOf(`function ${name}`);
   assert.notEqual(start, -1, `Expected to find function ${name}`);
 
-  const signatureEnd = html.indexOf(')', start);
-  const bodyStart = html.indexOf('{', signatureEnd);
+  const signatureEnd = source.indexOf(')', start);
+  const bodyStart = source.indexOf('{', signatureEnd);
   let depth = 0;
 
-  for (let index = bodyStart; index < html.length; index++) {
-    const char = html[index];
+  for (let index = bodyStart; index < source.length; index++) {
+    const char = source[index];
     if (char === '{') depth++;
     if (char === '}') depth--;
-    if (depth === 0) return html.slice(start, index + 1);
+    if (depth === 0) return source.slice(start, index + 1);
   }
 
   throw new Error(`Could not extract function ${name}`);
@@ -30,8 +31,8 @@ assert.match(
   /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-553V1C3J93/,
   'Expected the production GA4 tag'
 );
-assert.match(html, /allow_google_signals:\s*false/);
-assert.match(html, /allow_ad_personalization_signals:\s*false/);
+assert.match(source, /allow_google_signals:\s*false/);
+assert.match(source, /allow_ad_personalization_signals:\s*false/);
 
 const calls = [];
 const context = vm.createContext({
@@ -83,7 +84,7 @@ assert.equal(api.trackAnalyticsEvent('Invalid Event Name', {}), false);
 assert.equal(calls.length, 1);
 
 const eventNames = Array.from(
-  html.matchAll(/trackAnalyticsEvent\('([a-z0-9_]+)'/g),
+  source.matchAll(/trackAnalyticsEvent\('([a-z0-9_]+)'/g),
   match => match[1]
 );
 
