@@ -324,6 +324,14 @@ let localHistory = [];
 let previousHtml = ''; // Track previous HTML for diffing
 let previousRenderContext = ''; // Screen/round/phase of the previous render
 let handoffNoticeTimer; // Hides the hand-off import banner
+let pointerDownTarget = null; // Where the current click started (see isBackdropClick)
+
+// A click whose press started inside a dialog (e.g. selecting pasted text and
+// releasing over the backdrop) is dispatched to the backdrop; don't treat it
+// as "click outside".
+function isBackdropClick(e, backdrop) {
+    return e.target === backdrop && (!pointerDownTarget || pointerDownTarget === backdrop);
+}
 let darkMode = false;
 let pendingImportNotice = null;
 
@@ -374,8 +382,6 @@ function initializeApp() {
                     round_number: importedState.currentRound
                 });
             }
-            // Clear the URL param so refresh doesn't re-import
-            window.history.replaceState({}, '', window.location.pathname + window.location.hash);
         } catch (err) {
             console.error('Failed to import from URL:', err);
             pendingImportNotice = {
@@ -383,6 +389,8 @@ function initializeApp() {
                 message: err.message || 'Failed to import game data.'
             };
         }
+        // Clear the URL param so refresh doesn't re-import (or repeat the error)
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }
 
     const savedTheme = readStorage(LOCAL_STORAGE_THEME_KEY);
@@ -427,14 +435,16 @@ function initializeApp() {
         }
     });
 
+    document.addEventListener('pointerdown', (e) => { pointerDownTarget = e.target; }, true);
     document.addEventListener('click', (e) => {
-        if (menuContent.classList.contains('active') && !menuContent.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+        if (menuContent.classList.contains('active') && !menuContent.contains(e.target) && !hamburgerBtn.contains(e.target) &&
+            !(pointerDownTarget && menuContent.contains(pointerDownTarget))) {
             setMenuOpen(false);
         }
         if (versionModal.classList.contains('active') && !versionModal.contains(e.target) && !versionBadge.contains(e.target)) {
             versionModal.classList.remove('active');
         }
-        if (gameDetailsModal.classList.contains('active') && e.target === gameDetailsModal) {
+        if (gameDetailsModal.classList.contains('active') && isBackdropClick(e, gameDetailsModal)) {
             closeGameDetailsModal();
         }
     });
@@ -495,7 +505,7 @@ function initializeApp() {
     }
     if (gameDetailsModal) {
         gameDetailsModal.addEventListener('click', (e) => {
-            if (e.target === gameDetailsModal) closeGameDetailsModal();
+            if (isBackdropClick(e, gameDetailsModal)) closeGameDetailsModal();
         });
     }
 
@@ -753,9 +763,16 @@ function renderApp() {
     const activeSelectionStart = activeElement && 'selectionStart' in activeElement ? activeElement.selectionStart : null;
     const activeSelectionEnd = activeElement && 'selectionEnd' in activeElement ? activeElement.selectionEnd : null;
 
+    const nameInput = document.getElementById('player-name');
+    const pendingPlayerName = restoreFocus && nameInput ? nameInput.value : '';
+
     // Update the DOM
     app.innerHTML = newHtml;
     previousHtml = newHtml;
+    if (pendingPlayerName) {
+        const newNameInput = document.getElementById('player-name');
+        if (newNameInput) newNameInput.value = pendingPlayerName;
+    }
 
     // Try to restore focus with selection if possible
     if (activeId) {
@@ -1862,9 +1879,15 @@ function showGameDetails(gameIndex) {
     gameDetailsModal.classList.add('active');
 }
 
+let gameDetailsClearTimer;
+
 function closeGameDetailsModal() {
      gameDetailsModal.classList.remove('active');
-     gameDetailsBody.innerHTML = ''; // Clear content
+     // Clear once the 0.3 s fade-out is over so the card doesn't collapse while visible.
+     window.clearTimeout(gameDetailsClearTimer);
+     gameDetailsClearTimer = window.setTimeout(() => {
+         if (!gameDetailsModal.classList.contains('active')) gameDetailsBody.innerHTML = '';
+     }, 300);
 }
 
 // --- Service Worker ---
@@ -2106,6 +2129,7 @@ function renderHandoffQRCode(container, text) {
 }
 
 function showHandoffQRModal() {
+    if (closeHandoffExport) closeHandoffExport();
     const modal = document.getElementById('handoff-qr-modal');
     const container = document.getElementById('handoff-qr-container');
     const closeBtn = document.getElementById('handoff-qr-close');
@@ -2119,7 +2143,7 @@ function showHandoffQRModal() {
     };
     closeHandoffExport = close;
     closeBtn.onclick = close;
-    modal.onclick = e => { if (e.target === modal) close(); };
+    modal.onclick = e => { if (isBackdropClick(e, modal)) close(); };
 
     // Export the game on screen (the saved copy can lag behind if storage is full).
     const fullState = currentMode === 'offline' && offlineState.gameStarted
@@ -2147,6 +2171,11 @@ function showHandoffQRModal() {
         const statusEl = document.createElement('div');
         statusEl.style.fontSize = '0.88rem';
         statusEl.setAttribute('role', 'status');
+        let statusHoldUntil = 0;
+        const holdStatus = () => {
+            statusHoldUntil = Date.now() + 4000;
+            statusEl.setAttribute('aria-live', 'polite');
+        };
         if (qrAvailable) {
             const imageContainer = document.createElement('div');
             imageContainer.style.width = '100%';
@@ -2154,9 +2183,14 @@ function showHandoffQRModal() {
             let frameIndex = 0;
             const drawFrame = () => {
                 renderHandoffQRCode(imageContainer, frames[frameIndex]);
-                setHandoffStatus(statusEl, frames.length === 1
-                    ? 'Ready to scan using Import from QR in 14-High.'
-                    : `Code ${frameIndex + 1} of ${frames.length} — keep scanning until the game opens.`);
+                // Leave a copy/share result on screen for a few seconds, and
+                // don't re-announce the cycling "Code N of M" to screen readers.
+                if (Date.now() >= statusHoldUntil) {
+                    if (frames.length > 1) statusEl.setAttribute('aria-live', 'off');
+                    setHandoffStatus(statusEl, frames.length === 1
+                        ? 'Ready to scan using Import from QR in 14-High.'
+                        : `Code ${frameIndex + 1} of ${frames.length} — keep scanning until the game opens.`);
+                }
                 frameIndex = (frameIndex + 1) % frames.length;
             };
             drawFrame();
@@ -2173,14 +2207,20 @@ function showHandoffQRModal() {
         copyLinkBtn.type = 'button';
         copyLinkBtn.className = 'btn-small';
         copyLinkBtn.innerHTML = '<i aria-hidden="true" class="fas fa-link"></i> Copy Link';
-        copyLinkBtn.addEventListener('click', () => copyHandoffText(handoff.importUrl, statusEl, 'Import link'));
+        copyLinkBtn.addEventListener('click', () => {
+            holdStatus();
+            copyHandoffText(handoff.importUrl, statusEl, 'Import link');
+        });
         actions.appendChild(copyLinkBtn);
 
         const copyPayloadBtn = document.createElement('button');
         copyPayloadBtn.type = 'button';
         copyPayloadBtn.className = 'btn-small';
         copyPayloadBtn.innerHTML = '<i aria-hidden="true" class="fas fa-copy"></i> Copy Import Data';
-        copyPayloadBtn.addEventListener('click', () => copyHandoffText(handoff.rawPayload, statusEl, 'Import data'));
+        copyPayloadBtn.addEventListener('click', () => {
+            holdStatus();
+            copyHandoffText(handoff.rawPayload, statusEl, 'Import data');
+        });
         actions.appendChild(copyPayloadBtn);
 
         if (navigator.share) {
@@ -2196,6 +2236,7 @@ function showHandoffQRModal() {
                 }).catch(err => {
                     if (err && err.name !== 'AbortError') {
                         console.error('Share failed:', err);
+                        holdStatus();
                         setHandoffStatus(statusEl, 'Share failed. Try Copy Link instead.', 'error');
                     }
                 });
@@ -2370,20 +2411,24 @@ function showHandoffImportModal() {
     const onVisibilityChange = () => { if (document.hidden) close(); };
     closeHandoffScanner = close;
     closeBtn.onclick = close;
-    modal.onclick = e => { if (e.target === modal) close(); };
+    modal.onclick = e => { if (isBackdropClick(e, modal)) close(); };
     window.addEventListener('pagehide', close);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    let rejectedScan = null;
     const acceptText = (text, source) => {
         if (closed || completed) return;
+        const value = String(text || '').trim();
+        if (source === 'qr' && value === rejectedScan) return;
         try {
-            const result = collectHandoffQRFrame(String(text || '').trim(), transfer);
+            const result = collectHandoffQRFrame(value, transfer);
             if (!result.payload) {
                 setHandoffStatus(statusEl, `Scanned ${result.received} of ${result.count} parts. Keep the camera pointed at the codes.`, 'success');
                 return;
             }
             completed = finishHandoffImport(result.payload, { statusEl, modal, source });
             if (completed) close();
+            else if (source === 'qr') rejectedScan = value;
         } catch (err) {
             setHandoffStatus(statusEl, err.message || 'Could not read game QR code.', 'error');
         }
@@ -2424,7 +2469,9 @@ function showHandoffImportModal() {
         // the phone is close enough to focus. Request rear-camera HD input.
         await scanner.start({ facingMode: 'environment' }, {
             fps: 10,
-            disableFlip: false,
+            // The vendor patch redraws each frame unmirrored, so the library's
+            // "flipped" retry would decode identical pixels a second time.
+            disableFlip: true,
             videoConstraints: { facingMode: { ideal: 'environment' },
                 width: { ideal: 1920 }, height: { ideal: 1080 } }
         }, text => acceptText(text, 'qr'), () => {});
