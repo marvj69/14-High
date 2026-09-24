@@ -59,11 +59,46 @@ try {
     await context.close();
   }
 
-  // A bad import link is shown once and removed from the address bar.
-  {
-    const { context, page, problems } = await openApp('?import=not-valid');
-    assert.equal(new URL(page.url()).search, '');
+  // A bad import link is shown once, readable below the header, and removed from the address bar.
+  for (const path of ['?import=not-valid', '#import=not-valid']) {
+    const { context, page, problems } = await openApp(path);
+    assert.equal(new URL(page.url()).search + new URL(page.url()).hash, '', `${path} is cleared`);
     assert.ok((await page.locator('#handoff-import-banner').innerText()).length > 0);
+    const visible = await page.evaluate(() => {
+      const text = document.querySelector('#handoff-import-banner span').getBoundingClientRect();
+      const hit = document.elementFromPoint(text.left + text.width / 2, text.top + text.height / 2);
+      return document.getElementById('handoff-import-banner').contains(hit);
+    });
+    assert.ok(visible, 'the import message is not hidden under the header');
+    assert.deepEqual(problems, []);
+    await context.close();
+  }
+
+  // Escape closes only the topmost layer; a second tab sees the first tab's new round.
+  {
+    const { context, page, problems } = await openApp();
+    await page.evaluate(() => localStorage.setItem('completedGames', JSON.stringify([
+      { mode: 'offline', date: '2026-08-01T19:30:00.000Z', winners: ['Bo'], score: 50, players: ['Ann', 'Bo'], finalScores: { Ann: 40, Bo: 50 }, eliminatedPlayers: [] }
+    ])));
+    await page.reload();
+    await page.click('.hamburger-btn');
+    await page.click('.completed-game-item');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#game-details-modal').evaluate(el => el.classList.contains('active')), false);
+    assert.equal(await page.locator('.menu-content').evaluate(el => el.classList.contains('active')), true, 'menu stays open');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.menu-content').evaluate(el => el.classList.contains('active')), false);
+
+    const other = await context.newPage();
+    await other.goto(baseURL);
+    await page.click('#select-offline-btn');
+    await addPlayers(page, ['Ann', 'Bo']);
+    await page.click('#start-game-btn');
+    await other.click('#select-offline-btn');
+    await other.waitForSelector('.bid-input');
+    await page.locator('.bid-input').nth(0).fill('1');
+    await other.waitForFunction(() => Object.values(offlineState.bids).includes(1) &&
+      [...document.querySelectorAll('.bid-input')].some(input => input.value === '1'));
     assert.deepEqual(problems, []);
     await context.close();
   }

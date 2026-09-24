@@ -24,6 +24,7 @@ function getAnalyticsPageLocation() {
     try {
         const url = new URL(window.location.href);
         url.searchParams.delete('import');
+        url.hash = '';
         return url.href;
     } catch (err) {
         return window.location.origin + window.location.pathname;
@@ -114,7 +115,7 @@ function sanitizePlayerNames(list) {
     const names = [];
     const seen = new Set();
     for (const entry of list) {
-        const name = typeof entry === 'string' || typeof entry === 'number' ? String(entry).trim() : '';
+        const name = typeof entry === 'string' || typeof entry === 'number' ? String(entry).replace(/[\r\0]/g, '').trim() : '';
         if (!name || seen.has(name) || isReservedKey(name)) continue;
         seen.add(name);
         names.push(name);
@@ -347,22 +348,29 @@ let darkMode = false;
 let pendingImportNotice = null;
 
 // --- DOM Elements ---
-const app = document.getElementById('app');
-const hamburgerBtn = document.querySelector('.hamburger-btn');
-const menuContent = document.querySelector('.menu-content');
-const menuClose = document.querySelector('.menu-close');
-const menuBackButton = document.getElementById('menu-back-button');
-const darkModeToggle = document.getElementById('dark-mode-toggle');
-const completedGamesList = document.getElementById('completed-games-list');
-const body = document.body;
-const versionBadge = document.getElementById('version-badge');
-const versionModal = document.getElementById('version-modal');
-const versionClose = document.getElementById('version-close');
-const eliminationBanner = document.getElementById('elimination-banner');
-const handoffImportBanner = document.getElementById('handoff-import-banner');
-const gameDetailsModal = document.getElementById('game-details-modal');
-const gameDetailsClose = document.getElementById('game-details-close');
-const gameDetailsBody = document.getElementById('game-details-body');
+// app.js loads in <head>; initializeApp() (called at the end of <body>) looks these up.
+let app, hamburgerBtn, menuContent, menuClose, menuBackButton, darkModeToggle, completedGamesList, body,
+    versionBadge, versionModal, versionClose, eliminationBanner, handoffImportBanner, gameDetailsModal,
+    gameDetailsClose, gameDetailsBody;
+
+function cacheDomElements() {
+    app = document.getElementById('app');
+    hamburgerBtn = document.querySelector('.hamburger-btn');
+    menuContent = document.querySelector('.menu-content');
+    menuClose = document.querySelector('.menu-close');
+    menuBackButton = document.getElementById('menu-back-button');
+    darkModeToggle = document.getElementById('dark-mode-toggle');
+    completedGamesList = document.getElementById('completed-games-list');
+    body = document.body;
+    versionBadge = document.getElementById('version-badge');
+    versionModal = document.getElementById('version-modal');
+    versionClose = document.getElementById('version-close');
+    eliminationBanner = document.getElementById('elimination-banner');
+    handoffImportBanner = document.getElementById('handoff-import-banner');
+    gameDetailsModal = document.getElementById('game-details-modal');
+    gameDetailsClose = document.getElementById('game-details-close');
+    gameDetailsBody = document.getElementById('game-details-body');
+}
 
 function setMenuOpen(isOpen) {
     if (!menuContent || !hamburgerBtn) return;
@@ -374,9 +382,11 @@ function setMenuOpen(isOpen) {
 
 // --- Initialization ---
 function initializeApp() {
+    cacheDomElements();
     // Check for QR import via URL param
     const urlParams = new URLSearchParams(window.location.search);
-    const importData = urlParams.get('import');
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const importData = urlParams.get('import') || hashParams.get('import');
     if (importData) {
         try {
             const parsed = parseCompressedHandoffState(importData);
@@ -401,7 +411,7 @@ function initializeApp() {
             };
         }
         // Clear the URL param so refresh doesn't re-import (or repeat the error)
-        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+        window.history.replaceState({}, '', window.location.pathname + (hashParams.has('import') ? '' : window.location.hash));
     }
 
     const savedTheme = readStorage(LOCAL_STORAGE_THEME_KEY);
@@ -461,12 +471,21 @@ function initializeApp() {
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            if (menuContent.classList.contains('active')) setMenuOpen(false);
-            if (versionModal.classList.contains('active')) versionModal.classList.remove('active');
-            if (gameDetailsModal.classList.contains('active')) closeGameDetailsModal();
-            if (closeHandoffExport) closeHandoffExport();
-            if (closeHandoffScanner) closeHandoffScanner();
+        if (e.key !== 'Escape') return;
+        // Close only the topmost layer (e.g. game details, not the menu behind it).
+        if (closeHandoffScanner) closeHandoffScanner();
+        else if (closeHandoffExport) closeHandoffExport();
+        else if (gameDetailsModal.classList.contains('active')) closeGameDetailsModal();
+        else if (versionModal.classList.contains('active')) versionModal.classList.remove('active');
+        else if (menuContent.classList.contains('active')) setMenuOpen(false);
+    });
+
+    // Another tab or window saved newer data; show it instead of overwriting it later.
+    window.addEventListener('storage', (e) => {
+        if (e.key === LOCAL_STORAGE_HISTORY_KEY) loadLocalHistory();
+        if (e.key === LOCAL_STORAGE_OFFLINE_KEY && currentMode === 'offline') {
+            loadOfflineState();
+            renderApp();
         }
     });
 
@@ -508,8 +527,8 @@ function initializeApp() {
                 e.preventDefault();
                 const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
                 if (!isNaN(gameIndex)) {
+                    rememberDialogOpener('game-details-close');
                     showGameDetails(gameIndex);
-                    gameDetailsClose.focus();
                 }
             }
         });
@@ -535,10 +554,13 @@ function initializeApp() {
     }
 
     document.body.addEventListener('click', (e) => {
+        // detail is 0 when a button is activated from the keyboard.
         if (e.target.closest('#handoff-qr-btn')) {
+            if (e.detail === 0) rememberDialogOpener('handoff-qr-close');
             showHandoffQRModal();
         }
         if (e.target.closest('#handoff-import-btn')) {
+            if (e.detail === 0) rememberDialogOpener('handoff-import-close');
             showHandoffImportModal();
         }
     });
@@ -1179,7 +1201,7 @@ function renderGameplay(currentState) {
                 `}).join('')}
                 ${eliminatedPlayers.map(player => `
                         <tr class="eliminated-player">
-                        <td>${escapeHtml(player)} <i aria-hidden="true" class="fas fa-user-slash"></i></td>
+                        <td>${escapeHtml(player)} <i class="fas fa-user-slash" role="img" aria-label="Eliminated"></i></td>
                         <td>${escapeHtml(bids[player] ?? '-')}</td>
                         ${!bidPhase ? `<td>${escapeHtml(tricks[player] ?? '-')}</td>` : ''}
                         <td>${escapeHtml(scores[player] || 0)}</td>
@@ -1244,7 +1266,7 @@ function renderGameplay(currentState) {
                     return `
                 <tr class="${isWinner ? 'winner-row' : ''} ${isEliminated ? 'eliminated-player' : ''}">
                     <td>${rank} ${medal}</td>
-                    <td>${escapeHtml(player)} ${isEliminated ? '<i aria-hidden="true" class="fas fa-user-slash" title="Eliminated"></i>' : ''}</td>
+                    <td>${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash" role="img" aria-label="Eliminated" title="Eliminated"></i>' : ''}</td>
                     <td>${escapeHtml(scores[player] || 0)}</td>
                 </tr>`;
                 }).join('')}
@@ -1874,7 +1896,7 @@ function showGameDetails(gameIndex) {
         const playerScore = game.finalScores[player] || 0;
         content += `
         <div class="player-score-item ${isWinner ? 'winner' : ''} ${isEliminated ? 'eliminated' : ''}">
-            <span class="player-score-name">${index + 1}. ${escapeHtml(player)} ${isEliminated ? '<i aria-hidden="true" class="fas fa-user-slash" title="Eliminated"></i>' : ''}</span>
+            <span class="player-score-name">${index + 1}. ${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash" role="img" aria-label="Eliminated" title="Eliminated"></i>' : ''}</span>
             <span class="player-score-value">${escapeHtml(playerScore)}</span>
         </div>`;
     });
@@ -1892,8 +1914,36 @@ function showGameDetails(gameIndex) {
 
 let gameDetailsClearTimer;
 
+// Keyboard-opened dialogs: focus the dialog's close button once it is shown,
+// and return focus to the opener when it closes. Pointer users are unaffected.
+let dialogOpener = null;
+let pendingDialogFocusId = null;
+
+function rememberDialogOpener(closeButtonId) {
+    dialogOpener = document.activeElement;
+    pendingDialogFocusId = closeButtonId;
+    let frames = 0;
+    // The dialog may appear a little later (e.g. after its scripts load).
+    const focusWhenShown = () => {
+        const closeButton = pendingDialogFocusId && document.getElementById(pendingDialogFocusId);
+        if (!closeButton) return;
+        closeButton.focus();
+        if (document.activeElement === closeButton || ++frames > 30) pendingDialogFocusId = null;
+        else requestAnimationFrame(focusWhenShown);
+    };
+    requestAnimationFrame(focusWhenShown);
+}
+
+function returnDialogFocus() {
+    const opener = dialogOpener;
+    dialogOpener = null;
+    pendingDialogFocusId = null;
+    if (opener && opener.isConnected && opener !== document.body) opener.focus();
+}
+
 function closeGameDetailsModal() {
      gameDetailsModal.classList.remove('active');
+     returnDialogFocus();
      // Clear once the 0.3 s fade-out is over so the card doesn't collapse while visible.
      window.clearTimeout(gameDetailsClearTimer);
      gameDetailsClearTimer = window.setTimeout(() => {
@@ -1928,7 +1978,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // --- Start the App ---
-initializeApp();
+// initializeApp() runs from the end of index.html's <body>, before first paint.
 
 // --- Hand-off QR Export/Import Logic ---
 function showHandoffImportNotice(message, type = 'success') {
@@ -1973,14 +2023,10 @@ function loadScriptOnce(src) {
 
 function setHandoffStatus(statusEl, message, type = 'info') {
     if (!statusEl) return;
+    const color = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--gray)';
+    if (statusEl.textContent === message && statusEl.style.color === color) return;
     statusEl.textContent = message;
-    if (type === 'success') {
-        statusEl.style.color = 'var(--success)';
-    } else if (type === 'error') {
-        statusEl.style.color = 'var(--danger)';
-    } else {
-        statusEl.style.color = 'var(--gray)';
-    }
+    statusEl.style.color = color;
 }
 
 function getMinimalHandoffState(fullState) {
@@ -2000,16 +2046,7 @@ function getMinimalHandoffState(fullState) {
 
 function buildHandoffImportUrl(compressed) {
     const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?import=${compressed}`;
-}
-
-function isLocalHandoffUrl(urlText) {
-    try {
-        const url = new URL(urlText);
-        return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-    } catch (err) {
-        return false;
-    }
+    return `${baseUrl}#import=${compressed}`;
 }
 
 function buildHandoffPayload(fullState) {
@@ -2023,9 +2060,7 @@ function buildHandoffPayload(fullState) {
         minimalState,
         compressed,
         importUrl,
-        rawPayload,
-        importUrlSize: new Blob([importUrl]).size,
-        rawPayloadSize: new Blob([rawPayload]).size
+        rawPayload
     };
 }
 
@@ -2140,6 +2175,14 @@ function renderHandoffQRCode(container, text) {
 }
 
 function showHandoffQRModal() {
+    // The QR and compression libraries are only needed here; load them on first use.
+    Promise.all([
+        loadScriptOnce(`vendor/lz-string.min.js?v=${APP_VERSION}`),
+        loadScriptOnce(`vendor/qrcode.min.js?v=${APP_VERSION}`)
+    ]).catch(err => console.warn(err)).then(renderHandoffExportModal);
+}
+
+function renderHandoffExportModal() {
     if (closeHandoffExport) closeHandoffExport();
     const modal = document.getElementById('handoff-qr-modal');
     const container = document.getElementById('handoff-qr-container');
@@ -2151,6 +2194,7 @@ function showHandoffQRModal() {
         window.clearInterval(frameTimer);
         modal.classList.remove('active');
         if (closeHandoffExport === close) closeHandoffExport = null;
+        returnDialogFocus();
     };
     closeHandoffExport = close;
     closeBtn.onclick = close;
@@ -2169,7 +2213,7 @@ function showHandoffQRModal() {
     try {
         // Compress the game state for QR export
         const handoff = buildHandoffPayload(fullState);
-        JSON.parse(LZString.decompressFromEncodedURIComponent(handoff.compressed));
+        JSON.parse(decompressHandoffData(handoff.compressed));
         const frames = buildHandoffQRFrames(handoff.rawPayload);
         const qrAvailable = frames.length > 0;
         trackAnalyticsEvent('handoff_export_opened', {
@@ -2318,7 +2362,7 @@ function parseHandoffImportText(decodedText) {
 function getImportParamFromText(text) {
     try {
         const url = new URL(text, window.location.href);
-        return url.searchParams.get('import');
+        return url.searchParams.get('import') || new URLSearchParams(url.hash.slice(1)).get('import');
     } catch (err) {
         return null;
     }
@@ -2418,6 +2462,7 @@ function showHandoffImportModal() {
         document.removeEventListener('visibilitychange', onVisibilityChange);
         handoffScannerCleanup = stopScanner();
         if (closeHandoffScanner === close) closeHandoffScanner = null;
+        if (!completed) returnDialogFocus();
     };
     const onVisibilityChange = () => { if (document.hidden) close(); };
     closeHandoffScanner = close;
@@ -2427,8 +2472,10 @@ function showHandoffImportModal() {
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     let rejectedScan = null;
+    let pasteAttempted = false;
     const acceptText = (text, source) => {
         if (closed || completed) return;
+        if (source === 'paste') pasteAttempted = true;
         const value = String(text || '').trim();
         if (source === 'qr' && value === rejectedScan) return;
         try {
@@ -2486,12 +2533,12 @@ function showHandoffImportModal() {
             videoConstraints: { facingMode: { ideal: 'environment' },
                 width: { ideal: 1920 }, height: { ideal: 1080 } }
         }, text => acceptText(text, 'qr'), () => {});
-        if (!closed && !completed) {
+        if (!closed && !completed && !pasteAttempted) {
             setHandoffStatus(statusEl, 'Point the camera at the whole QR code. The game opens here automatically.');
         }
     }).catch(err => {
         console.warn('Camera start failed:', err);
-        if (!closed && !completed) {
+        if (!closed && !completed && !pasteAttempted) {
             setHandoffStatus(statusEl, `Camera unavailable: ${err.message || err}. Allow camera access and reopen Import from QR, or paste import data below.`, 'error');
         }
     });

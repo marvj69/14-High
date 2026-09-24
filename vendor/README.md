@@ -14,7 +14,14 @@ in `vercel.json` can stay strict) and precached by `service-worker.js` for offli
 
 ## QR libraries
 
-`html5-qrcode.min.js` is loaded on demand when Import from QR opens.
+All three load on demand: the scanner when Import from QR opens, the other two when
+Hand-off via QR opens.
+
+- `html5-qrcode.min.js` — [mebjas/html5-qrcode](https://github.com/mebjas/html5-qrcode),
+  Apache License 2.0, with the local patch described below.
+- `qrcode.min.js` — [davidshimjs/qrcodejs](https://github.com/davidshimjs/qrcodejs), MIT.
+- `lz-string.min.js` — [pieroxy/lz-string](https://github.com/pieroxy/lz-string) 1.4.x, MIT.
+  Imports are decompressed by a size-capped copy of its decoder in `app.js`.
 
 ## Local html5-qrcode camera-resolution patch
 

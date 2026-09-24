@@ -82,9 +82,10 @@ async function respondToNavigation(network) {
   const timedOut = new Promise(resolve => { timer = setTimeout(resolve, NAVIGATION_TIMEOUT_MS, null); });
   try {
     const response = await Promise.race([network, timedOut]);
-    if (response) return response;
+    if (response && response.status < 500) return response;
+    // Slow network or a server error: use the installed app shell.
     const shell = await caches.match(APP_SHELL, { cacheName: CACHE_NAME });
-    return shell || await network;
+    return shell || response || await network;
   } catch (err) {
     return (await caches.match(APP_SHELL, { cacheName: CACHE_NAME })) ||
       (await caches.match(OFFLINE_PAGE, { cacheName: CACHE_NAME })) ||

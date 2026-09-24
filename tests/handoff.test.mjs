@@ -25,6 +25,7 @@ function extractFunction(name) {
 }
 
 const context = vm.createContext({
+  URLSearchParams,
   URL,
   window: { location: { href: 'https://example.com/14-High/' } },
   LZString: {

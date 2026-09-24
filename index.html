@@ -470,7 +470,8 @@
             border: 1px solid var(--border); background-color: var(--light); color: var(--dark);
             box-shadow: var(--shadow-sm); font-size: 0.9rem;
         }
-        .handoff-import-banner.active { display: flex; gap: 0.5rem; align-items: flex-start; }
+        .handoff-import-banner.active { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 4.5rem; }
+        .handoff-import-banner.active + #app { margin-top: 0; }
         .handoff-import-banner.success { border-color: rgba(16, 185, 129, 0.4); color: var(--success); background: rgba(16, 185, 129, 0.08); }
         .handoff-import-banner.error { border-color: rgba(239, 68, 68, 0.4); color: var(--danger); background: rgba(239, 68, 68, 0.08); }
         [data-theme="dark"] .handoff-payload, [data-theme="dark"] .handoff-import-controls textarea, [data-theme="dark"] .handoff-import-banner {
@@ -554,6 +555,7 @@
         .version-modal .close-btn:focus-visible { box-shadow: var(--ring); }
         .round-history-item summary:focus-visible { outline-offset: -2px; }
     </style>
+    <script src="app.js?v=2.6.0"></script>
 </head>
 <body data-theme="light">
     <!-- Apply the saved theme before first paint (hash-allowed in the vercel.json CSP). -->
@@ -663,8 +665,6 @@
             </ul>
         </div>
     </div>
-    <script src="vendor/lz-string.min.js?v=2.6.0"></script>
-    <script src="vendor/qrcode.min.js?v=2.6.0"></script>
-    <script src="app.js?v=2.6.0"></script>
+    <script>initializeApp();</script>
 </body>
 </html>

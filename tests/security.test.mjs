@@ -39,7 +39,7 @@ const fakeLocalStorage = {
 };
 
 const context = vm.createContext({
-  URL, console: { warn() {}, error() {}, log() {} }, localStorage: fakeLocalStorage,
+  URL, URLSearchParams, console: { warn() {}, error() {}, log() {} }, localStorage: fakeLocalStorage,
   window: { location: { href: 'https://14-high.vercel.app/' } }
 });
 vm.runInContext(readFileSync(join(__dirname, '..', 'vendor/lz-string.min.js'), 'utf8'), context);
@@ -155,6 +155,8 @@ const hostile = {
 {
   assert.throws(() => api.normalizeImportedGameState({ players: 'Ann', gameStarted: true }), /Invalid game data/);
   assert.throws(() => api.normalizeImportedGameState({ players: ['__proto__', 'Ann'], gameStarted: true }), /at least 2 players/);
+  const hashLink = `https://14-high.vercel.app/#import=${LZString.compressToEncodedURIComponent(JSON.stringify({ players: ['Ann', 'Bo'], gameStarted: true }))}`;
+  assert.deepEqual(plain(api.parseHandoffImportText(hashLink).players), ['Ann', 'Bo'], 'new #import= links');
   const link = `https://14-high.vercel.app/?import=${LZString.compressToEncodedURIComponent(JSON.stringify(hostile))}`;
   const imported = plain(api.normalizeImportedGameState(api.parseHandoffImportText(link)));
   assert.ok(!JSON.stringify(imported).includes('onerror'));
