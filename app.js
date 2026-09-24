@@ -14,6 +14,255 @@ const LOCAL_STORAGE_OFFLINE_KEY = 'offlineGameState';
 const LOCAL_STORAGE_HISTORY_KEY = 'completedGames';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
 const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
+// Generous caps: a full 56-player, 14-round game is well under these.
+const HANDOFF_MAX_COMPRESSED_LENGTH = 200000;
+const HANDOFF_MAX_JSON_LENGTH = 1000000;
+const MAX_ROUND_HISTORY = 14;
+
+// --- Safe storage ---
+// Blocked (private mode, disabled site data), full or corrupt storage must never stop the app.
+function readStorage(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (err) {
+        console.warn('Storage unavailable:', err);
+        return null;
+    }
+}
+
+function isQuotaError(err) {
+    return !!err && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+        err.code === 22 || err.code === 1014);
+}
+
+function writeStorage(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return { saved: true, full: false };
+    } catch (err) {
+        console.error(`Could not save ${key}:`, err);
+        return { saved: false, full: isQuotaError(err) };
+    }
+}
+
+function removeStorage(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (err) {
+        console.warn('Storage unavailable:', err);
+    }
+}
+
+function readStoredJSON(key) {
+    const raw = readStorage(key);
+    if (raw === null) return null;
+    try {
+        return JSON.parse(raw);
+    } catch (err) {
+        console.error(`Ignoring unreadable ${key}:`, err);
+        return null;
+    }
+}
+
+// --- Game data validation ---
+// Saved and imported games are untrusted: every value that reaches the page or
+// the scoring must have the expected type. Names matching Object.prototype
+// members (e.g. "__proto__", "constructor") cannot be used as object keys.
+function isReservedKey(key) {
+    return key in Object.prototype;
+}
+
+function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isHandCount(value) {
+    return Number.isInteger(value) && value >= 0 && value <= 14;
+}
+
+function isScoreValue(value) {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function sanitizePlayerNames(list) {
+    if (!Array.isArray(list)) return [];
+    const names = [];
+    const seen = new Set();
+    for (const entry of list) {
+        const name = String(entry || '').trim();
+        if (!name || seen.has(name) || isReservedKey(name)) continue;
+        seen.add(name);
+        names.push(name);
+        if (names.length === MAX_PLAYERS) break;
+    }
+    return names;
+}
+
+function sanitizeValueMap(source, isValid) {
+    const result = {};
+    if (!isPlainObject(source)) return result;
+    Object.keys(source).forEach(key => {
+        if (!isReservedKey(key) && isValid(source[key])) result[key] = source[key];
+    });
+    return result;
+}
+
+function normalizeDealerIndex(value, playerCount) {
+    if (!Number.isInteger(value) || playerCount === 0) return 0;
+    return ((value % playerCount) + playerCount) % playerCount;
+}
+
+function copyOwnFields(source) {
+    const copy = {};
+    Object.keys(source).forEach(key => {
+        if (!isReservedKey(key)) copy[key] = source[key];
+    });
+    return copy;
+}
+
+function sanitizeRoundEntry(entry) {
+    if (!isPlainObject(entry)) return null;
+    const clean = copyOwnFields(entry);
+    const has = key => Object.prototype.hasOwnProperty.call(clean, key);
+    ['players', 'eliminatedPlayers'].forEach(key => {
+        if (!has(key)) return;
+        if (Array.isArray(clean[key])) clean[key] = sanitizePlayerNames(clean[key]);
+        else delete clean[key];
+    });
+    if (has('currentRound') && !(Number.isInteger(clean.currentRound) && clean.currentRound >= 1 && clean.currentRound <= 14)) {
+        delete clean.currentRound;
+    }
+    if (has('dealerIndex') && !Number.isInteger(clean.dealerIndex)) delete clean.dealerIndex;
+    if (has('bidPhase') && typeof clean.bidPhase !== 'boolean') delete clean.bidPhase;
+    clean.bids = sanitizeValueMap(entry.bids, isHandCount);
+    clean.tricks = sanitizeValueMap(entry.tricks, isHandCount);
+    clean.scores = sanitizeValueMap(entry.scores, isScoreValue);
+    return clean;
+}
+
+function sanitizeRoundHistory(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(sanitizeRoundEntry).filter(Boolean).slice(-MAX_ROUND_HISTORY);
+}
+
+function sanitizeGameState(raw) {
+    const source = isPlainObject(raw) ? raw : {};
+    const players = sanitizePlayerNames(source.players);
+    const numericRound = Number(source.currentRound);
+    return {
+        ...getDefaultOfflineState(),
+        players,
+        gameStarted: source.gameStarted === true,
+        currentRound: Number.isFinite(numericRound) ? Math.min(Math.max(Math.trunc(numericRound), 1), 15) : 1,
+        dealerIndex: normalizeDealerIndex(source.dealerIndex, players.length),
+        bids: sanitizeValueMap(source.bids, isHandCount),
+        tricks: sanitizeValueMap(source.tricks, isHandCount),
+        scores: sanitizeValueMap(source.scores, isScoreValue),
+        bidPhase: source.bidPhase !== false,
+        eliminatedPlayers: sanitizePlayerNames(source.eliminatedPlayers),
+        roundHistory: sanitizeRoundHistory(source.roundHistory)
+    };
+}
+
+function sanitizeCompletedGame(game) {
+    if (!isPlainObject(game)) return null;
+    const clean = copyOwnFields(game);
+    clean.winners = sanitizePlayerNames(game.winners);
+    clean.players = sanitizePlayerNames(game.players);
+    clean.eliminatedPlayers = sanitizePlayerNames(game.eliminatedPlayers);
+    clean.finalScores = sanitizeValueMap(game.finalScores, isScoreValue);
+    clean.score = isScoreValue(game.score) ? game.score : 0;
+    if (typeof clean.date !== 'string' && typeof clean.date !== 'number') clean.date = null;
+    if (Object.prototype.hasOwnProperty.call(clean, 'roundHistory')) {
+        if (Array.isArray(clean.roundHistory)) clean.roundHistory = sanitizeRoundHistory(clean.roundHistory);
+        else delete clean.roundHistory;
+    }
+    return clean;
+}
+
+// LZString.decompressFromEncodedURIComponent (lz-string 1.4.4, MIT) with an
+// output cap: a short crafted link could otherwise expand into gigabytes and
+// freeze or crash the tab. tests/handoff.test.mjs checks it against the library.
+const LZ_URI_SAFE_VALUES = new Map(Array.from(
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$', (char, index) => [char, index]));
+
+function decompressHandoffData(input, maxLength = HANDOFF_MAX_JSON_LENGTH) {
+    if (input === null || input === undefined) return '';
+    if (input === '') return null;
+    const text = String(input).replace(/ /g, '+');
+    const data = { val: LZ_URI_SAFE_VALUES.get(text.charAt(0)), position: 32, index: 1 };
+    const readBits = count => {
+        let bits = 0;
+        const maxpower = Math.pow(2, count);
+        let power = 1;
+        while (power !== maxpower) {
+            const resb = data.val & data.position;
+            data.position >>= 1;
+            if (data.position === 0) {
+                data.position = 32;
+                data.val = LZ_URI_SAFE_VALUES.get(text.charAt(data.index++));
+            }
+            bits |= (resb > 0 ? 1 : 0) * power;
+            power <<= 1;
+        }
+        return bits;
+    };
+    const dictionary = [0, 1, 2];
+    const result = [];
+    let enlargeIn = 4;
+    let dictSize = 4;
+    let numBits = 3;
+    let c;
+    switch (readBits(2)) {
+        case 0: c = String.fromCharCode(readBits(8)); break;
+        case 1: c = String.fromCharCode(readBits(16)); break;
+        case 2: return '';
+    }
+    dictionary[3] = c;
+    let w = c;
+    let outputLength = c ? c.length : 0;
+    result.push(c);
+    while (true) {
+        if (data.index > text.length) return '';
+        let code = readBits(numBits);
+        switch (code) {
+            case 0:
+                dictionary[dictSize++] = String.fromCharCode(readBits(8));
+                code = dictSize - 1;
+                enlargeIn--;
+                break;
+            case 1:
+                dictionary[dictSize++] = String.fromCharCode(readBits(16));
+                code = dictSize - 1;
+                enlargeIn--;
+                break;
+            case 2:
+                return result.join('');
+        }
+        if (enlargeIn === 0) {
+            enlargeIn = Math.pow(2, numBits);
+            numBits++;
+        }
+        let entry;
+        if (dictionary[code]) {
+            entry = dictionary[code];
+        } else if (code === dictSize) {
+            entry = w + w.charAt(0);
+        } else {
+            return null;
+        }
+        outputLength += entry.length;
+        if (outputLength > maxLength) throw new Error('Import data is too large.');
+        result.push(entry);
+        dictionary[dictSize++] = w + entry.charAt(0);
+        enlargeIn--;
+        w = entry;
+        if (enlargeIn === 0) {
+            enlargeIn = Math.pow(2, numBits);
+            numBits++;
+        }
+    }
+}
 
 function getSafeAnalyticsParams(params = {}) {
     const numericKeys = new Set([
@@ -118,7 +367,7 @@ function initializeApp() {
         }
     }
 
-    const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
+    const savedTheme = readStorage(LOCAL_STORAGE_THEME_KEY);
     if (savedTheme === 'dark') {
         darkMode = true;
         if (darkModeToggle) darkModeToggle.checked = true;
@@ -243,17 +492,11 @@ function selectMode(mode) {
 
 // Check if there's a saved offline game in localStorage
 function hasSavedOfflineGame() {
-    const savedState = localStorage.getItem(LOCAL_STORAGE_OFFLINE_KEY);
+    const savedState = readStoredJSON(LOCAL_STORAGE_OFFLINE_KEY);
     if (!savedState) return false;
-    
-    try {
-        const state = JSON.parse(savedState);
-        // Check if the game was actually started and has players
-        return state.gameStarted && state.players && state.players.length >= 2;
-    } catch (err) {
-        console.error('Error checking saved offline game:', err);
-        return false;
-    }
+    const state = sanitizeGameState(savedState);
+    // Check if the game was actually started and has players
+    return state.gameStarted && state.players.length >= 2;
 }
 
 function goBackToEntry() {
@@ -432,23 +675,23 @@ function renderApp() {
     if (newHtml === previousHtml) {
         return;
     }
-    
+
     // More efficient DOM update strategy to minimize flicker
     // Create a temporary div to parse the HTML
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = newHtml;
-    
+
     // Cache active element before DOM update
     const activeElement = document.activeElement;
     const activeId = activeElement ? activeElement.id : null;
     const activeDataPlayer = activeElement ? activeElement.getAttribute('data-player') : null;
     const activeSelectionStart = activeElement && 'selectionStart' in activeElement ? activeElement.selectionStart : null;
     const activeSelectionEnd = activeElement && 'selectionEnd' in activeElement ? activeElement.selectionEnd : null;
-    
+
     // Update the DOM
     app.innerHTML = newHtml;
     previousHtml = newHtml;
-    
+
     // Try to restore focus with selection if possible
     if (activeId) {
         const newActiveElement = document.getElementById(activeId);
@@ -469,7 +712,7 @@ function renderApp() {
             }
         }
     }
-    
+
     applyPostRenderFocus(currentState);
 
     // Always update validation/buttons after render for the active offline game
@@ -515,7 +758,7 @@ function applyPostRenderFocus(currentState) {
             return; // Exit early - we've restored focus
         }
     }
-    
+
     // Default focus behavior if we can't restore previous focus
     if (currentMode === 'entry') {
          const offlineBtn = document.getElementById('select-offline-btn');
@@ -532,7 +775,7 @@ function applyPostRenderFocus(currentState) {
             if (firstInput && (firstInput.value === '' || firstInput.value === null)) firstInput.focus();
          }
     }
-    
+
     // Ensure back-to-menu button has a direct event listener as a fallback
     const backToMenuBtn = document.getElementById('back-to-menu-btn');
     if (backToMenuBtn) {
@@ -610,7 +853,7 @@ function renderEntryScreen() {
     const offlineButtonText = hasSavedGame ? 
         `<i class="fas fa-undo"></i> Continue Offline Game` : 
         `<i class="fas fa-play"></i> Start Offline Game`;
-    
+
     return `
         <div class="card mode-selection-container">
             <h2><i class="fas fa-dice"></i> Start a Game</h2>
@@ -832,27 +1075,27 @@ function renderGameplay(currentState) {
                     </td>
                     <td>
                         ${bidPhase
-                        ? `<input type="number" min="0" max="${currentRound}" value="${bidValue}"
+                        ? `<input type="number" min="0" max="${currentRound}" value="${escapeHtml(bidValue)}"
                             class="bid-input" data-player="${escapeHtml(player)}" aria-label="${escapeHtml(player)} bid"
                             inputmode="numeric" pattern="[0-9]*">`
-                        : `<span class="badge badge-blue">${bidValue === '' || bidValue === null ? '?' : bidValue}</span>`}
+                        : `<span class="badge badge-blue">${bidValue === '' || bidValue === null ? '?' : escapeHtml(bidValue)}</span>`}
                     </td>
                     ${!bidPhase
                         ? `<td class="trick-value">
-                            <input type="number" min="0" max="14" value="${trickValue}"
+                            <input type="number" min="0" max="14" value="${escapeHtml(trickValue)}"
                             class="trick-input" data-player="${escapeHtml(player)}" aria-label="${escapeHtml(player)} hands won"
                             inputmode="numeric" pattern="[0-9]*">
                         </td>`
                         : ''}
-                    <td><span class="score-value">${scores[player] || 0}</span></td>
+                    <td><span class="score-value">${escapeHtml(scores[player] || 0)}</span></td>
                     </tr>
                 `}).join('')}
                 ${eliminatedPlayers.map(player => `
                         <tr class="eliminated-player">
                         <td>${escapeHtml(player)} <i class="fas fa-user-slash"></i></td>
-                        <td>${bids[player] ?? '-'}</td>
-                        ${!bidPhase ? `<td>${tricks[player] ?? '-'}</td>` : ''}
-                        <td>${scores[player] || 0}</td>
+                        <td>${escapeHtml(bids[player] ?? '-')}</td>
+                        ${!bidPhase ? `<td>${escapeHtml(tricks[player] ?? '-')}</td>` : ''}
+                        <td>${escapeHtml(scores[player] || 0)}</td>
                         </tr>
                     `).join('')}
                  ${players.length === 0 && eliminatedPlayers.length === 0 ? '<tr><td colspan="4" style="text-align:center; color: var(--gray);">No players in game.</td></tr>' : ''}
@@ -877,7 +1120,7 @@ function renderGameplay(currentState) {
                     <div class="winner-name">
                         <i class="fas fa-crown"></i> ${winners.map(escapeHtml).join(' & ')}
                     </div>
-                    <p>${scores[winners[0]] || 0} points</p>
+                    <p>${escapeHtml(scores[winners[0]] || 0)} points</p>
                     </div>`
                 : '<p style="text-align:center; color: var(--gray);">Could not determine winner.</p>'}
 
@@ -914,7 +1157,7 @@ function renderGameplay(currentState) {
                 <tr class="${isWinner ? 'winner-row' : ''} ${isEliminated ? 'eliminated-player' : ''}">
                     <td>${rank} ${medal}</td>
                     <td>${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash" title="Eliminated"></i>' : ''}</td>
-                    <td>${scores[player] || 0}</td>
+                    <td>${escapeHtml(scores[player] || 0)}</td>
                 </tr>`;
                 }).join('')}
                  ${sortedPlayers.length === 0 ? '<tr><td colspan="3" style="text-align:center; color: var(--gray);">No players on scoreboard yet.</td></tr>' : ''}
@@ -963,7 +1206,7 @@ function renderCompletedGames() {
         return `<div class="completed-game-item" data-game-index="${index}">
                         <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
                         <div class="game-winner"><i class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
-                        <div class="game-score"><i class="fas fa-star"></i> ${game.score} points</div>
+                        <div class="game-score"><i class="fas fa-star"></i> ${escapeHtml(game.score)} points</div>
                         <div style="font-size: 0.8rem;">
                         <i class="fas fa-users"></i> ${allParticipants.length} Players ${elimCount ? `(${elimCount} Eliminated)` : ''}
                         </div>
@@ -989,37 +1232,20 @@ function getDefaultOfflineState() {
 }
 
 function loadOfflineState() {
-    const savedState = localStorage.getItem(LOCAL_STORAGE_OFFLINE_KEY);
-    if (savedState) {
-        try {
-            offlineState = JSON.parse(savedState);
-            // Ensure all default keys exist for compatibility
-            offlineState = { ...getDefaultOfflineState(), ...offlineState };
-            const totalPlayers = offlineState.players.length;
-            if (!Number.isInteger(offlineState.dealerIndex) || totalPlayers === 0) {
-                offlineState.dealerIndex = 0;
-            } else {
-                const normalizedIndex = ((offlineState.dealerIndex % totalPlayers) + totalPlayers) % totalPlayers;
-                offlineState.dealerIndex = offlineState.players[normalizedIndex] === undefined ? 0 : normalizedIndex;
-            }
-            console.log('Offline game state loaded.');
-        } catch (err) {
-            console.error('Error loading offline game state:', err);
-            offlineState = getDefaultOfflineState();
-            localStorage.removeItem(LOCAL_STORAGE_OFFLINE_KEY);
-        }
-    } else {
-        offlineState = getDefaultOfflineState();
-        console.log('No saved offline game state found, using default.');
-    }
+    // Validate on every load: saves written by older versions may hold imported
+    // data that was never checked.
+    offlineState = sanitizeGameState(readStoredJSON(LOCAL_STORAGE_OFFLINE_KEY));
 }
 
 function saveOfflineState() {
-    try {
-        localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, JSON.stringify(offlineState));
-    } catch (err) {
-        console.error('Error saving offline game state:', err);
+    const json = JSON.stringify(offlineState);
+    let result = writeStorage(LOCAL_STORAGE_OFFLINE_KEY, json);
+    // When storage is full, make room from old games' round details rather
+    // than silently losing the game in progress.
+    while (!result.saved && result.full && dropOldestRoundDetails(localHistory.length) && persistHistory()) {
+        result = writeStorage(LOCAL_STORAGE_OFFLINE_KEY, json);
     }
+    return result.saved;
 }
 
 function addPlayerOffline() {
@@ -1192,7 +1418,6 @@ function startGameOffline() {
      } else {
          offlineState.currentRound = 15; // Game over
          saveCompletedGameToLocal(offlineState);
-         localStorage.removeItem(LOCAL_STORAGE_OFFLINE_KEY); // Clear current game state after saving history
      }
 
      trackAnalyticsEvent('round_recorded', {
@@ -1289,7 +1514,7 @@ function applyTheme(theme) {
     const newTheme = (theme === 'dark') ? 'dark' : 'light';
     body.setAttribute('data-theme', newTheme);
     darkModeToggle.checked = newTheme === 'dark';
-    localStorage.setItem(LOCAL_STORAGE_THEME_KEY, newTheme);
+    writeStorage(LOCAL_STORAGE_THEME_KEY, newTheme);
     console.log("Theme applied:", newTheme);
 }
 
@@ -1464,7 +1689,7 @@ function showEliminationBanner(elimination) {
 function hideEliminationBanner() {
     const origBanner = document.getElementById('elimination-banner');
     if (origBanner) origBanner.style.display = 'none';
-    
+
     const roundBanner = document.getElementById('round-elimination-banner');
     if (roundBanner) roundBanner.style.display = 'none';
 }
@@ -1484,14 +1709,14 @@ function showQRCode(gameId) {
     const qrCodeModal = document.getElementById('qr-code-modal');
     const qrCodeContainer = document.getElementById('qr-code-container');
     const qrCodeClose = document.getElementById('qr-code-close');
-    
+
     // Clear previous QR code
     qrCodeContainer.innerHTML = '';
-    
+
     // Generate a QR code with just the game ID as plain text
     // This will allow the user to easily copy it after scanning
     const qrData = gameId;
-    
+
     try {
         // Generate QR code with qrcodejs
         new QRCode(qrCodeContainer, {
@@ -1502,12 +1727,12 @@ function showQRCode(gameId) {
             colorLight: "#ffffff",
             correctLevel: QRCode.CorrectLevel.H
         });
-        
+
         // Add game ID display and copy button below QR code
         const infoContainer = document.createElement('div');
         infoContainer.style.marginTop = '1rem';
         infoContainer.style.textAlign = 'center';
-        
+
         // Game ID display
         const gameIdDisplay = document.createElement('div');
         gameIdDisplay.style.fontFamily = 'monospace';
@@ -1518,13 +1743,13 @@ function showQRCode(gameId) {
         gameIdDisplay.style.marginBottom = '0.5rem';
         gameIdDisplay.style.wordBreak = 'break-all';
         gameIdDisplay.textContent = gameId;
-        
+
         // Copy button
         const copyBtn = document.createElement('button');
         copyBtn.className = 'btn-small';
         copyBtn.innerHTML = '<i class="far fa-copy"></i> Copy Game ID';
         copyBtn.style.margin = '0 auto';
-        
+
         // Feedback element
         const feedbackEl = document.createElement('span');
         feedbackEl.className = 'copy-feedback';
@@ -1532,7 +1757,7 @@ function showQRCode(gameId) {
         feedbackEl.textContent = 'Copied!';
         feedbackEl.style.display = 'block';
         feedbackEl.style.marginTop = '0.5rem';
-        
+
         // Add click handler for copy button
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(gameId).then(() => {
@@ -1543,13 +1768,13 @@ function showQRCode(gameId) {
                 alert('Copy failed.');
             });
         });
-        
+
         // Append elements
         infoContainer.appendChild(gameIdDisplay);
         infoContainer.appendChild(copyBtn);
         infoContainer.appendChild(feedbackEl);
         qrCodeContainer.appendChild(infoContainer);
-        
+
         // Update instructions
         const instructionsDiv = document.querySelector('.qr-code-instructions');
         if (instructionsDiv) {
@@ -1562,15 +1787,15 @@ function showQRCode(gameId) {
         console.error('Failed to generate QR code:', err);
         qrCodeContainer.innerHTML = '<p>QR code generation failed. Please try again.</p>';
     }
-    
+
     // Show modal
     qrCodeModal.classList.add('active');
-    
+
     // Add close handler
     qrCodeClose.onclick = function() {
         qrCodeModal.classList.remove('active');
     };
-    
+
     // Close on background click
     qrCodeModal.onclick = function(e) {
         if (e.target === qrCodeModal) {
@@ -1580,9 +1805,36 @@ function showQRCode(gameId) {
 }
 
 // --- Local History Management ---
+function readStoredHistory() {
+    const stored = readStoredJSON(LOCAL_STORAGE_HISTORY_KEY);
+    return Array.isArray(stored) ? stored.map(sanitizeCompletedGame).filter(Boolean) : null;
+}
+
 function loadLocalHistory() {
-    localHistory = JSON.parse(localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY)) || [];
+    localHistory = readStoredHistory() || [];
     renderCompletedGames();
+}
+
+// Removes the round-by-round details of the oldest game that still has them
+// (its summary stays). Used only when storage is full.
+function dropOldestRoundDetails(limit) {
+    for (let i = 0; i < Math.min(limit, localHistory.length); i++) {
+        const game = localHistory[i];
+        if (game && Array.isArray(game.roundHistory) && game.roundHistory.length > 0) {
+            delete game.roundHistory;
+            return true;
+        }
+    }
+    return false;
+}
+
+function persistHistory() {
+    let result = writeStorage(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(localHistory));
+    // Keep the newest game's details; trim older ones until the history fits.
+    while (!result.saved && result.full && dropOldestRoundDetails(localHistory.length - 1)) {
+        result = writeStorage(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(localHistory));
+    }
+    return result.saved;
 }
 
 function saveCompletedGameToLocal(finalState) {
@@ -1599,9 +1851,10 @@ function saveCompletedGameToLocal(finalState) {
         roundHistory: JSON.parse(JSON.stringify(finalState.roundHistory || [])),
         wasReset: finalState.wasReset || false // Include reset flag if it exists
     };
-    localHistory = JSON.parse(localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY)) || [];
+    // Re-read so games finished in another tab are kept.
+    localHistory = readStoredHistory() || localHistory;
     localHistory.push(completedGame);
-    localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(localHistory));
+    persistHistory();
     renderCompletedGames();
 }
 
@@ -1620,7 +1873,7 @@ function showGameDetails(gameIndex) {
         <h4>${game.winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h4>
         <div class="winner-names">
             <i class="fas fa-crown"></i> ${game.winners.map(escapeHtml).join(' & ')}
-            <span style="margin-left:auto;">${game.score} points</span>
+            <span style="margin-left:auto;">${escapeHtml(game.score)} points</span>
         </div>
         </div>
         <h4>All Players (${allParticipants.length})</h4>
@@ -1635,7 +1888,7 @@ function showGameDetails(gameIndex) {
         content += `
         <div class="player-score-item ${isWinner ? 'winner' : ''} ${isEliminated ? 'eliminated' : ''}">
             <span class="player-score-name">${index + 1}. ${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash" title="Eliminated"></i>' : ''}</span>
-            <span class="player-score-value">${playerScore}</span>
+            <span class="player-score-value">${escapeHtml(playerScore)}</span>
         </div>`;
     });
     content += `</div></div>
@@ -1858,7 +2111,7 @@ function showHandoffQRModal() {
         modal.classList.add('active');
         return;
     }
-    
+
     try {
         // Parse and compress the game state for QR export
         const fullState = JSON.parse(stateStr);
@@ -1940,7 +2193,7 @@ function showHandoffQRModal() {
         payloadText.value = handoff.rawPayload;
         payloadText.setAttribute('aria-label', 'Raw hand-off import data');
         container.appendChild(payloadText);
-        
+
     } catch (err) {
         console.error('QR generation error:', err);
         container.innerHTML = `
@@ -1948,18 +2201,21 @@ function showHandoffQRModal() {
                 <i class="fas fa-times-circle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                 <p><strong>QR code generation failed</strong></p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;">
-                    Error: ${err.message || 'Unknown error'}<br>
+                    Error: ${escapeHtml(err.message || 'Unknown error')}<br>
                     Please try again or start a new game.
                 </p>
             </div>
         `;
     }
-    
+
     modal.classList.add('active');
 }
 
 function parseCompressedHandoffState(compressed) {
-    const jsonStr = LZString.decompressFromEncodedURIComponent(compressed);
+    if (String(compressed).length > HANDOFF_MAX_COMPRESSED_LENGTH) {
+        throw new Error('Import data is too large.');
+    }
+    const jsonStr = decompressHandoffData(compressed);
     if (!jsonStr) {
         throw new Error('Could not read compressed game data.');
     }
@@ -1982,6 +2238,7 @@ function parseHandoffImportText(decodedText) {
     }
 
     if (text.startsWith('14HIGH:')) {
+        if (text.length > HANDOFF_MAX_JSON_LENGTH) throw new Error('Import data is too large.');
         return JSON.parse(text.slice(7));
     }
 
@@ -1998,46 +2255,20 @@ function getImportParamFromText(text) {
 }
 
 function normalizeImportedGameState(parsed) {
-    if (!parsed || !Array.isArray(parsed.players) || typeof parsed.gameStarted !== 'boolean') {
+    if (!isPlainObject(parsed) || !Array.isArray(parsed.players) || typeof parsed.gameStarted !== 'boolean') {
         throw new Error('Invalid game data format. Missing required fields.');
     }
 
-    const players = parsed.players
-        .map(player => String(player || '').trim())
-        .filter(Boolean)
-        .slice(0, MAX_PLAYERS);
-
-    if (parsed.gameStarted && players.length < 2) {
+    const state = sanitizeGameState(parsed);
+    if (state.gameStarted && state.players.length < 2) {
         throw new Error('Imported games need at least 2 players.');
     }
-
-    const numericRound = Number(parsed.currentRound);
-    const currentRound = Number.isFinite(numericRound)
-        ? Math.min(Math.max(Math.trunc(numericRound), 1), 15)
-        : 1;
-
-    return {
-        ...getDefaultOfflineState(),
-        players,
-        gameStarted: parsed.gameStarted,
-        currentRound,
-        dealerIndex: Number.isInteger(parsed.dealerIndex) ? parsed.dealerIndex : 0,
-        bids: parsed.bids && typeof parsed.bids === 'object' ? parsed.bids : {},
-        tricks: parsed.tricks && typeof parsed.tricks === 'object' ? parsed.tricks : {},
-        scores: parsed.scores && typeof parsed.scores === 'object' ? parsed.scores : {},
-        bidPhase: parsed.bidPhase !== false,
-        eliminatedPlayers: Array.isArray(parsed.eliminatedPlayers) ? parsed.eliminatedPlayers : [],
-        roundHistory: Array.isArray(parsed.roundHistory)
-            ? JSON.parse(JSON.stringify(parsed.roundHistory))
-            : []
-    };
+    return state;
 }
 
 function importOfflineGameState(parsed) {
-    const fullState = normalizeImportedGameState(parsed);
-    localStorage.setItem(LOCAL_STORAGE_OFFLINE_KEY, JSON.stringify(fullState));
-    offlineState = fullState;
-    loadOfflineState();
+    offlineState = normalizeImportedGameState(parsed);
+    saveOfflineState();
     return offlineState;
 }
 

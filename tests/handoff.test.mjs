@@ -39,9 +39,32 @@ const context = vm.createContext({
 
 vm.runInContext(readFileSync(join(__dirname, '..', 'vendor/lz-string.min.js'), 'utf8'), context);
 
+function extractConst(name) {
+  const start = html.indexOf(`const ${name} =`);
+  assert.notEqual(start, -1, `Expected to find const ${name}`);
+  return html.slice(start, html.indexOf(';\n', start) + 1);
+}
+
 vm.runInContext(`
   const MAX_PLAYERS = 56;
   const HANDOFF_COMPRESSED_PREFIX = '14HIGHZ:';
+  ${extractConst('HANDOFF_MAX_COMPRESSED_LENGTH')}
+  ${extractConst('HANDOFF_MAX_JSON_LENGTH')}
+  ${extractConst('MAX_ROUND_HISTORY')}
+  ${extractConst('LZ_URI_SAFE_VALUES')}
+  ${extractFunction('decompressHandoffData')}
+  ${extractFunction('isReservedKey')}
+  ${extractFunction('isPlainObject')}
+  ${extractFunction('isHandCount')}
+  ${extractFunction('isScoreValue')}
+  ${extractFunction('sanitizePlayerNames')}
+  ${extractFunction('sanitizeValueMap')}
+  ${extractFunction('normalizeDealerIndex')}
+  ${extractFunction('copyOwnFields')}
+  ${extractFunction('sanitizeRoundEntry')}
+  ${extractFunction('sanitizeRoundHistory')}
+  ${extractFunction('sanitizeGameState')}
+  ${extractFunction('sanitizeCompletedGame')}
   ${extractFunction('handoffChecksum')}
   ${extractFunction('buildHandoffQRFrames')}
   ${extractFunction('collectHandoffQRFrame')}
@@ -53,6 +76,9 @@ vm.runInContext(`
   ${extractFunction('normalizeImportedGameState')}
 
   globalThis.handoff = {
+    decompressHandoffData,
+    sanitizeGameState,
+    sanitizeCompletedGame,
     buildHandoffQRFrames,
     collectHandoffQRFrame,
     parseCompressedHandoffState,
