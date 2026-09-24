@@ -470,7 +470,9 @@
             border: 1px solid var(--border); background-color: var(--light); color: var(--dark);
             box-shadow: var(--shadow-sm); font-size: 0.9rem;
         }
-        .handoff-import-banner.active { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 4.5rem; }
+        /* Shown in the space #app keeps below the fixed header; the card stays where it was
+           (the banner's 1rem bottom margin used to collapse into #app's 4.5rem top margin). */
+        .handoff-import-banner.active { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 3.5rem; }
         .handoff-import-banner.active + #app { margin-top: 0; }
         .handoff-import-banner.success { border-color: rgba(16, 185, 129, 0.4); color: var(--success); background: rgba(16, 185, 129, 0.08); }
         .handoff-import-banner.error { border-color: rgba(239, 68, 68, 0.4); color: var(--danger); background: rgba(239, 68, 68, 0.08); }
