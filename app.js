@@ -4,12 +4,26 @@ function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'G-553V1C3J93', {
     allow_google_signals: false,
-    allow_ad_personalization_signals: false
+    allow_ad_personalization_signals: false,
+    page_location: getAnalyticsPageLocation()
 });
+
+// Hand-off links carry the whole game (player names, scores) in ?import=; never report it.
+function getAnalyticsPageLocation() {
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('import');
+        return url.href;
+    } catch (err) {
+        return window.location.origin + window.location.pathname;
+    }
+}
 
 // --- Constants & Config ---
 const MAX_PLAYERS = 56;
 const ELIMINATION_THRESHOLD = 56;
+// Keep in sync with APP_VERSION in service-worker.js and the ?v= queries in index.html.
+const APP_VERSION = '2.6.0';
 const LOCAL_STORAGE_OFFLINE_KEY = 'offlineGameState';
 const LOCAL_STORAGE_HISTORY_KEY = 'completedGames';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -89,7 +103,7 @@ function sanitizePlayerNames(list) {
     const names = [];
     const seen = new Set();
     for (const entry of list) {
-        const name = String(entry || '').trim();
+        const name = typeof entry === 'string' || typeof entry === 'number' ? String(entry).trim() : '';
         if (!name || seen.has(name) || isReservedKey(name)) continue;
         seen.add(name);
         names.push(name);
@@ -308,6 +322,8 @@ let currentMode = 'entry'; // 'entry' or 'offline'
 let offlineState = {};
 let localHistory = [];
 let previousHtml = ''; // Track previous HTML for diffing
+let previousRenderContext = ''; // Screen/round/phase of the previous render
+let handoffNoticeTimer; // Hides the hand-off import banner
 let darkMode = false;
 let pendingImportNotice = null;
 
@@ -345,19 +361,21 @@ function initializeApp() {
     if (importData) {
         try {
             const parsed = parseCompressedHandoffState(importData);
-            const importedState = importOfflineGameState(parsed);
+            if (confirmReplacingSavedGame(normalizeImportedGameState(parsed))) {
+                const importedState = importOfflineGameState(parsed);
+                currentMode = 'offline';
+                pendingImportNotice = {
+                    type: 'success',
+                    message: getImportSuccessMessage(importedState)
+                };
+                trackAnalyticsEvent('handoff_imported', {
+                    import_source: 'url',
+                    player_count: importedState.players.length,
+                    round_number: importedState.currentRound
+                });
+            }
             // Clear the URL param so refresh doesn't re-import
             window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-            currentMode = 'offline';
-            pendingImportNotice = {
-                type: 'success',
-                message: getImportSuccessMessage(importedState)
-            };
-            trackAnalyticsEvent('handoff_imported', {
-                import_source: 'url',
-                player_count: importedState.players.length,
-                round_number: importedState.currentRound
-            });
         } catch (err) {
             console.error('Failed to import from URL:', err);
             pendingImportNotice = {
@@ -382,7 +400,8 @@ function initializeApp() {
         showHandoffImportNotice(pendingImportNotice.message, pendingImportNotice.type);
         pendingImportNotice = null;
     }
-    menuBackButton.style.display = 'none';
+    // An import link opens straight into the game, so the menu needs its Back item.
+    menuBackButton.style.display = currentMode === 'offline' ? 'block' : 'none';
 
     app.addEventListener('click', handleAppClick);
     app.addEventListener('keypress', handleAppKeyPress);
@@ -396,7 +415,17 @@ function initializeApp() {
     setMenuOpen(false);
     hamburgerBtn.addEventListener('click', () => setMenuOpen(true));
     menuClose.addEventListener('click', () => setMenuOpen(false));
-    menuBackButton.addEventListener('click', goBackToEntry);
+    menuBackButton.addEventListener('click', () => {
+        menuBackButton.blur();
+        goBackToEntry();
+    });
+    menuBackButton.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            menuBackButton.blur();
+            goBackToEntry();
+        }
+    });
 
     document.addEventListener('click', (e) => {
         if (menuContent.classList.contains('active') && !menuContent.contains(e.target) && !hamburgerBtn.contains(e.target)) {
@@ -415,6 +444,8 @@ function initializeApp() {
             if (menuContent.classList.contains('active')) setMenuOpen(false);
             if (versionModal.classList.contains('active')) versionModal.classList.remove('active');
             if (gameDetailsModal.classList.contains('active')) closeGameDetailsModal();
+            if (closeHandoffExport) closeHandoffExport();
+            if (closeHandoffScanner) closeHandoffScanner();
         }
     });
 
@@ -426,6 +457,13 @@ function initializeApp() {
         versionBadge.addEventListener('click', (e) => {
             e.stopPropagation();
             versionModal.classList.add('active');
+        });
+        versionBadge.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                versionModal.classList.add('active');
+            }
         });
     }
     if (versionClose) {
@@ -441,6 +479,17 @@ function initializeApp() {
             if (gameItem) {
                 const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
                 if (!isNaN(gameIndex)) showGameDetails(gameIndex);
+            }
+        });
+        completedGamesList.addEventListener('keydown', (e) => {
+            const gameItem = e.target.closest('.completed-game-item');
+            if (gameItem && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                const gameIndex = parseInt(gameItem.getAttribute('data-game-index'));
+                if (!isNaN(gameIndex)) {
+                    showGameDetails(gameIndex);
+                    gameDetailsClose.focus();
+                }
             }
         });
     }
@@ -648,12 +697,24 @@ function handleAppInput(e) {
 
     if (bidInput && offlineState.gameStarted && offlineState.bidPhase) {
         const player = bidInput.getAttribute('data-player');
-        const value = bidInput.value;
-        if (player) handleBidChangeOffline(player, value);
+        if (player) {
+            handleBidChangeOffline(player, bidInput.value);
+            showStoredValue(bidInput, offlineState.bids[player]);
+        }
     } else if (trickInput && offlineState.gameStarted && !offlineState.bidPhase) {
         const player = trickInput.getAttribute('data-player');
-        const value = trickInput.value;
-        if (player) handleTricksChangeOffline(player, value);
+        if (player) {
+            handleTricksChangeOffline(player, trickInput.value);
+            showStoredValue(trickInput, offlineState.tricks[player]);
+        }
+    }
+}
+
+// Bids are capped at the round number and hands at 14; show the number that
+// was actually recorded instead of leaving e.g. "99" on screen.
+function showStoredValue(input, storedValue) {
+    if (input.value !== '' && storedValue !== undefined && input.value !== String(storedValue)) {
+        input.value = String(storedValue);
     }
 }
 
@@ -676,10 +737,14 @@ function renderApp() {
         return;
     }
 
-    // More efficient DOM update strategy to minimize flicker
-    // Create a temporary div to parse the HTML
-    const tempContainer = document.createElement('div');
-    tempContainer.innerHTML = newHtml;
+    // Restore focus only while the same screen/round/phase is shown. After a
+    // phase change (e.g. Enter on the last bid) focus goes to the first input,
+    // not to the same player's field in the next table.
+    const renderContext = currentMode === 'offline' && currentState.gameStarted
+        ? `offline|${currentState.currentRound}|${currentState.bidPhase}`
+        : `${currentMode}|setup`;
+    const restoreFocus = renderContext === previousRenderContext;
+    previousRenderContext = renderContext;
 
     // Cache active element before DOM update
     const activeElement = document.activeElement;
@@ -702,8 +767,8 @@ function renderApp() {
                 newActiveElement.selectionEnd = activeSelectionEnd;
             }
         }
-    } else if (activeDataPlayer) {
-        const newActiveElements = document.querySelectorAll(`[data-player="${activeDataPlayer}"]`);
+    } else if (activeDataPlayer && restoreFocus) {
+        const newActiveElements = findByDataPlayer(app.querySelectorAll('[data-player]'), activeDataPlayer);
         if (newActiveElements.length > 0) {
             newActiveElements[0].focus();
             if (activeSelectionStart !== null && activeSelectionEnd !== null && 'selectionStart' in newActiveElements[0]) {
@@ -713,7 +778,7 @@ function renderApp() {
         }
     }
 
-    applyPostRenderFocus(currentState);
+    applyPostRenderFocus(currentState, restoreFocus);
 
     // Always update validation/buttons after render for the active offline game
     if (currentMode === 'offline') {
@@ -724,23 +789,26 @@ function renderApp() {
     }
 }
 
-function applyPostRenderFocus(currentState) {
+// Player names are free text, so match data-player by value instead of
+// building a CSS selector from them (a quote in a name would throw).
+function findByDataPlayer(elements, player) {
+    return Array.from(elements).filter(el => el.getAttribute('data-player') === player);
+}
+
+function applyPostRenderFocus(currentState, restoreFocus = true) {
     // Preserve the currently focused element
     const activeElementId = document.activeElement ? document.activeElement.id : '';
-    const activeElementSelector = document.activeElement ? 
-        (document.activeElement.getAttribute('data-player') ? 
-            `.${document.activeElement.classList[0]}[data-player="${document.activeElement.getAttribute('data-player')}"]` : 
-            '') : 
-        '';
-    const hadFocus = document.activeElement && 
+    const activeClass = document.activeElement ? document.activeElement.classList[0] : '';
+    const activePlayer = document.activeElement ? document.activeElement.getAttribute('data-player') : null;
+    const hadFocus = restoreFocus && document.activeElement && 
         (document.activeElement.classList.contains('bid-input') || 
          document.activeElement.classList.contains('trick-input'));
     const selectionStart = hadFocus ? document.activeElement.selectionStart : null;
     const selectionEnd = hadFocus ? document.activeElement.selectionEnd : null;
 
     // Try to restore focus to the same element
-    if (hadFocus && activeElementSelector) {
-        const elementToFocus = document.querySelector(activeElementSelector);
+    if (hadFocus && activeClass && activePlayer) {
+        const elementToFocus = findByDataPlayer(document.getElementsByClassName(activeClass), activePlayer)[0];
         if (elementToFocus) {
             elementToFocus.focus();
             if (selectionStart !== null && selectionEnd !== null) {
@@ -775,15 +843,6 @@ function applyPostRenderFocus(currentState) {
             if (firstInput && (firstInput.value === '' || firstInput.value === null)) firstInput.focus();
          }
     }
-
-    // Ensure back-to-menu button has a direct event listener as a fallback
-    const backToMenuBtn = document.getElementById('back-to-menu-btn');
-    if (backToMenuBtn) {
-        // Remove any existing listeners to prevent duplicates
-        backToMenuBtn.removeEventListener('click', goBackToEntry);
-        // Add a fresh listener
-        backToMenuBtn.addEventListener('click', goBackToEntry);
-    }
 }
 
 function updateValidationAndButtons() {
@@ -801,16 +860,16 @@ function updateValidationAndButtons() {
     if (bidInfoEl && state.bidPhase) {
         if (allPlayersHaveBid(state)) {
             if (totalBids === state.currentRound) {
-                bidInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Invalid: Total bids cannot equal ${state.currentRound} (currently ${totalBids}).`;
+                bidInfoEl.innerHTML = `<i aria-hidden="true" class="fas fa-exclamation-triangle"></i> Invalid: Total bids cannot equal ${state.currentRound} (currently ${totalBids}).`;
                 bidInfoEl.className = 'game-info bid-warning';
             } else {
-                bidInfoEl.innerHTML = `<i class="fas fa-check-circle"></i> Valid Bids: Total ${totalBids}`;
+                bidInfoEl.innerHTML = `<i aria-hidden="true" class="fas fa-check-circle"></i> Valid Bids: Total ${totalBids}`;
                 bidInfoEl.className = 'game-info bid-ok';
             }
         } else {
             const waitingFor = players.filter(p => !state.bids || state.bids[p] === undefined || state.bids[p] === null);
             const waitingText = waitingFor.length > 0 ? ` Waiting for ${waitingFor.length > 2 ? waitingFor.length + ' players' : waitingFor.map(escapeHtml).join(' & ')}.` : '';
-            bidInfoEl.innerHTML = `<i class="fas fa-info-circle"></i> Total bids: ${totalBids} / ${state.currentRound}.${waitingText}`;
+            bidInfoEl.innerHTML = `<i aria-hidden="true" class="fas fa-info-circle"></i> Total bids: ${totalBids} / ${state.currentRound}.${waitingText}`;
             bidInfoEl.className = 'game-info';
         }
     }
@@ -820,16 +879,16 @@ function updateValidationAndButtons() {
     if (trickInfoEl && !state.bidPhase) {
         if (allPlayersHaveTricks(state)) {
             if (totalTricks !== state.currentRound) {
-                trickInfoEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Invalid: Total hands must equal ${state.currentRound} (currently ${totalTricks})`;
+                trickInfoEl.innerHTML = `<i aria-hidden="true" class="fas fa-exclamation-triangle"></i> Invalid: Total hands must equal ${state.currentRound} (currently ${totalTricks})`;
                 trickInfoEl.className = 'game-info trick-warning';
             } else {
-                trickInfoEl.innerHTML = `<i class="fas fa-check-circle"></i> Valid Hands: Total ${totalTricks}`;
+                trickInfoEl.innerHTML = `<i aria-hidden="true" class="fas fa-check-circle"></i> Valid Hands: Total ${totalTricks}`;
                 trickInfoEl.className = 'game-info trick-ok';
             }
         } else {
             const waitingFor = players.filter(p => !state.tricks || state.tricks[p] === undefined || state.tricks[p] === null);
             const waitingText = waitingFor.length > 0 ? ` Waiting for ${waitingFor.length > 2 ? waitingFor.length + ' players' : waitingFor.map(escapeHtml).join(' & ')}.` : '';
-            trickInfoEl.innerHTML = `<i class="fas fa-info-circle"></i> Total hands: ${totalTricks} / ${state.currentRound}.${waitingText}`;
+            trickInfoEl.innerHTML = `<i aria-hidden="true" class="fas fa-info-circle"></i> Total hands: ${totalTricks} / ${state.currentRound}.${waitingText}`;
             trickInfoEl.className = 'game-info';
         }
     }
@@ -851,17 +910,17 @@ function renderEntryScreen() {
     // Check if there's a saved offline game
     const hasSavedGame = hasSavedOfflineGame();
     const offlineButtonText = hasSavedGame ? 
-        `<i class="fas fa-undo"></i> Continue Offline Game` : 
-        `<i class="fas fa-play"></i> Start Offline Game`;
+        `<i aria-hidden="true" class="fas fa-undo"></i> Continue Offline Game` : 
+        `<i aria-hidden="true" class="fas fa-play"></i> Start Offline Game`;
 
     return `
         <div class="card mode-selection-container">
-            <h2><i class="fas fa-dice"></i> Start a Game</h2>
+            <h2><i aria-hidden="true" class="fas fa-dice"></i> Start a Game</h2>
             <div class="card">
-                <h3><i class="fas fa-user-friends"></i> Play Offline</h3>
+                <h3><i aria-hidden="true" class="fas fa-user-friends"></i> Play Offline</h3>
                 <p>Play solo or pass the device around. Game progress is saved locally in your browser.</p>
                 <button id="select-offline-btn" class="btn-full">${offlineButtonText}</button>
-                <button id="handoff-import-btn" class="btn-small" style="margin-top:0.5rem;"><i class="fas fa-qrcode"></i> Import from QR</button>
+                <button id="handoff-import-btn" class="btn-small" style="margin-top:0.5rem;"><i aria-hidden="true" class="fas fa-qrcode"></i> Import from QR</button>
             </div>
         </div>
     `;
@@ -873,34 +932,34 @@ function renderPlayerSetup(currentState) {
 
      return `
         <div class="card">
-          <h2><i class="fas fa-users-cog"></i> Player Setup</h2>
+          <h2><i aria-hidden="true" class="fas fa-users-cog"></i> Player Setup</h2>
 
            <div class="input-group">
              <div class="input-with-button">
                <input type="text" id="player-name" placeholder="Enter player name" aria-label="Player name">
-               <button class="btn-add" id="add-player-btn"><i class="fas fa-plus"></i> Add Player</button>
+               <button class="btn-add" id="add-player-btn"><i aria-hidden="true" class="fas fa-plus"></i> Add Player</button>
              </div>
            </div>
 
            ${players.length > 0 ? `
              <div>
-               <h3><i class="fas fa-list-ul"></i> Current Players (${players.length})</h3>
+               <h3><i aria-hidden="true" class="fas fa-list-ul"></i> Current Players (${players.length})</h3>
                <div class="player-list">
                  ${players.map((player, idx) => `
   <div class="player-item">
     <span class="player-name">
       ${escapeHtml(player)}
-      ${idx === 0 ? '<span class="dealer-badge"><i class="fas fa-crown"></i> Dealer</span>' : ''}
+      ${idx === 0 ? '<span class="dealer-badge"><i aria-hidden="true" class="fas fa-crown"></i> Dealer</span>' : ''}
     </span>
     <div style="display: flex; gap: 0.25rem; align-items: center;">
       <button class="btn-move-up" data-player="${escapeHtml(player)}" ${idx === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(player)} up" tabindex="0" title="Move up">
-<i class="fas fa-arrow-up"></i>
+<i aria-hidden="true" class="fas fa-arrow-up"></i>
       </button>
       <button class="btn-move-down" data-player="${escapeHtml(player)}" ${idx === players.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(player)} down" tabindex="0" title="Move down">
-<i class="fas fa-arrow-down"></i>
+<i aria-hidden="true" class="fas fa-arrow-down"></i>
       </button>
       <button class="btn-remove" data-player="${escapeHtml(player)}" aria-label="Remove ${escapeHtml(player)}">
-<i class="fas fa-times"></i>
+<i aria-hidden="true" class="fas fa-times"></i>
       </button>
     </div>
   </div>
@@ -914,14 +973,14 @@ function renderPlayerSetup(currentState) {
              class="btn-full btn-green"
              ${players.length < 2 ? 'disabled' : ''}
            >
-             <i class="fas fa-play"></i>
+             <i aria-hidden="true" class="fas fa-play"></i>
              ${players.length < 2
                ? 'Need at least 2 players'
                : `Start Game (${players.length} Players)`}
            </button>
            <div class="button-group" style="margin-top: 1.5rem; justify-content: center;">
-               <button id="back-to-menu-btn" class="btn-outline"><i class="fas fa-arrow-left"></i> Back to Start</button>
-               <button id="handoff-import-btn" class="btn-small"><i class="fas fa-qrcode"></i> Import from QR</button>
+               <button id="back-to-menu-btn" class="btn-outline"><i aria-hidden="true" class="fas fa-arrow-left"></i> Back to Start</button>
+               <button id="handoff-import-btn" class="btn-small"><i aria-hidden="true" class="fas fa-qrcode"></i> Import from QR</button>
            </div>
         </div>
      `;
@@ -961,7 +1020,7 @@ function getRoundHistoryRows(roundEntry) {
 function renderRoundHistory(roundHistory, emptyMessage = 'No completed rounds yet.') {
     const rounds = Array.isArray(roundHistory) ? roundHistory : [];
     if (rounds.length === 0) {
-        return `<p class="round-history-empty"><i class="fas fa-info-circle"></i> ${escapeHtml(emptyMessage)}</p>`;
+        return `<p class="round-history-empty"><i aria-hidden="true" class="fas fa-info-circle"></i> ${escapeHtml(emptyMessage)}</p>`;
     }
 
     return `<div class="round-history-list">
@@ -977,7 +1036,7 @@ function renderRoundHistory(roundHistory, emptyMessage = 'No completed rounds ye
                 <details class="round-history-item"${openAttribute}>
                     <summary>
                         <span class="round-history-summary">
-                            <span><i class="fas fa-layer-group"></i> Round ${roundNumber}</span>
+                            <span><i aria-hidden="true" class="fas fa-layer-group"></i> Round ${roundNumber}</span>
                             <span class="round-history-meta">${dealerName ? `Dealer: ${escapeHtml(dealerName)} · ` : ''}Total bids: ${totalBids}</span>
                         </span>
                     </summary>
@@ -1031,16 +1090,16 @@ function renderGameplay(currentState) {
 
     // --- Round Input / Game Over ---
     if (currentRound <= 14) {
-        const bidInfoHtml = bidPhase ? '<div id="bid-info" class="game-info"></div>' : '';
-        const tricksInfoHtml = !bidPhase ? '<div id="trick-info" class="game-info"></div>' : '';
+        const bidInfoHtml = bidPhase ? '<div id="bid-info" class="game-info" aria-live="polite"></div>' : '';
+        const tricksInfoHtml = !bidPhase ? '<div id="trick-info" class="game-info" aria-live="polite"></div>' : '';
         gameplayHtml += `
         <div class="card">
             <div class="flex-between" style="margin-bottom: 0.25rem;">
-            <h2><i class="fas fa-tasks"></i> Round ${currentRound} / 14</h2>
+            <h2><i aria-hidden="true" class="fas fa-tasks"></i> Round ${currentRound} / 14</h2>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span class="game-status">${bidPhase ? 'Bidding Phase' : 'Enter Hands Won'}</span>
                 <div id="round-elimination-banner" style="display: none; position: static;" class="elimination-banner">
-                <i class="fas fa-exclamation-triangle"></i>
+                <i aria-hidden="true" class="fas fa-exclamation-triangle"></i>
                 <span id="round-elimination-message">Upcoming elimination</span>
                 </div>
             </div>
@@ -1069,8 +1128,8 @@ function renderGameplay(currentState) {
                     <td>
                         <span class="player-name">
                             ${escapeHtml(player)}
-                            ${isDealer ? '<span class="dealer-badge"><i class="fas fa-crown"></i> Dealer</span>' : ''}
-                            ${isLeader ? '<span class="lead-badge"><i class="fas fa-hand-point-right"></i> Leads</span>' : ''}
+                            ${isDealer ? '<span class="dealer-badge"><i aria-hidden="true" class="fas fa-crown"></i> Dealer</span>' : ''}
+                            ${isLeader ? '<span class="lead-badge"><i aria-hidden="true" class="fas fa-hand-point-right"></i> Leads</span>' : ''}
                         </span>
                     </td>
                     <td>
@@ -1092,7 +1151,7 @@ function renderGameplay(currentState) {
                 `}).join('')}
                 ${eliminatedPlayers.map(player => `
                         <tr class="eliminated-player">
-                        <td>${escapeHtml(player)} <i class="fas fa-user-slash"></i></td>
+                        <td>${escapeHtml(player)} <i aria-hidden="true" class="fas fa-user-slash"></i></td>
                         <td>${escapeHtml(bids[player] ?? '-')}</td>
                         ${!bidPhase ? `<td>${escapeHtml(tricks[player] ?? '-')}</td>` : ''}
                         <td>${escapeHtml(scores[player] || 0)}</td>
@@ -1104,8 +1163,8 @@ function renderGameplay(currentState) {
             </div>
 
             ${bidPhase
-            ? `<button id="submit-bids-btn" class="btn-full"><i class="fas fa-check-circle"></i> Confirm Bids</button>`
-            : `<button id="submit-results-btn" class="btn-full btn-green"><i class="fas fa-flag-checkered"></i> Submit Round ${currentRound} Results</button>`
+            ? `<button id="submit-bids-btn" class="btn-full"><i aria-hidden="true" class="fas fa-check-circle"></i> Confirm Bids</button>`
+            : `<button id="submit-results-btn" class="btn-full btn-green"><i aria-hidden="true" class="fas fa-flag-checkered"></i> Submit Round ${currentRound} Results</button>`
             }
         </div>
         `;
@@ -1113,22 +1172,22 @@ function renderGameplay(currentState) {
          const winners = getWinners(currentState);
          gameplayHtml += `
             <div class="card">
-                <h2><i class="fas fa-trophy"></i> Game Over!</h2>
+                <h2><i aria-hidden="true" class="fas fa-trophy"></i> Game Over!</h2>
                 ${winners.length > 0
                 ? `<div class="winner-display">
                     <h3>${winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h3>
                     <div class="winner-name">
-                        <i class="fas fa-crown"></i> ${winners.map(escapeHtml).join(' & ')}
+                        <i aria-hidden="true" class="fas fa-crown"></i> ${winners.map(escapeHtml).join(' & ')}
                     </div>
                     <p>${escapeHtml(scores[winners[0]] || 0)} points</p>
                     </div>`
                 : '<p style="text-align:center; color: var(--gray);">Could not determine winner.</p>'}
 
                 <button id="reset-game-btn" class="btn-full btn-red">
-                   <i class="fas fa-power-off"></i> Start New Game
+                   <i aria-hidden="true" class="fas fa-power-off"></i> Start New Game
                 </button>
                  <button id="back-to-menu-btn" class="btn-full btn-outline" style="margin-top: 0.75rem;">
-                    <i class="fas fa-arrow-left"></i> Back to Start
+                    <i aria-hidden="true" class="fas fa-arrow-left"></i> Back to Start
                 </button>
             </div>
          `;
@@ -1137,10 +1196,11 @@ function renderGameplay(currentState) {
     // --- Scoreboard ---
      const allPlayersForScoreboard = [...new Set([...(currentState.players || []), ...(currentState.eliminatedPlayers || [])])];
      const sortedPlayers = getSortedPlayers(scores, allPlayersForScoreboard);
+     const finalWinners = currentRound > 14 ? getWinners(currentState) : [];
 
     gameplayHtml += `
         <div class="card">
-        <h2><i class="fas fa-clipboard-list"></i> Scoreboard</h2>
+        <h2><i aria-hidden="true" class="fas fa-clipboard-list"></i> Scoreboard</h2>
         <div class="table-container">
             <table>
             <thead><tr><th>Rank</th><th>Player</th><th>Score</th></tr></thead>
@@ -1148,15 +1208,15 @@ function renderGameplay(currentState) {
                 ${sortedPlayers.map((player, index) => {
                     const rank = index + 1;
                     const isEliminated = eliminatedPlayers.includes(player);
-                    const isWinner = currentRound > 14 && getWinners(currentState).includes(player);
+                    const isWinner = finalWinners.includes(player);
                     let medal = '';
-                    if (isWinner && rank === 1) medal = '<i class="fas fa-medal" style="color: #d4af37;"></i>';
-                    else if (currentRound > 14 && rank === 2) medal = '<i class="fas fa-medal" style="color: #c0c0c0;"></i>';
-                    else if (currentRound > 14 && rank === 3) medal = '<i class="fas fa-medal" style="color: #cd7f32;"></i>';
+                    if (isWinner) medal = '<i aria-hidden="true" class="fas fa-medal" style="color: #d4af37;"></i>';
+                    else if (currentRound > 14 && rank === 2) medal = '<i aria-hidden="true" class="fas fa-medal" style="color: #c0c0c0;"></i>';
+                    else if (currentRound > 14 && rank === 3) medal = '<i aria-hidden="true" class="fas fa-medal" style="color: #cd7f32;"></i>';
                     return `
                 <tr class="${isWinner ? 'winner-row' : ''} ${isEliminated ? 'eliminated-player' : ''}">
                     <td>${rank} ${medal}</td>
-                    <td>${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash" title="Eliminated"></i>' : ''}</td>
+                    <td>${escapeHtml(player)} ${isEliminated ? '<i aria-hidden="true" class="fas fa-user-slash" title="Eliminated"></i>' : ''}</td>
                     <td>${escapeHtml(scores[player] || 0)}</td>
                 </tr>`;
                 }).join('')}
@@ -1167,7 +1227,7 @@ function renderGameplay(currentState) {
         </div>
 
         <div class="card">
-        <h2><i class="fas fa-history"></i> Round History</h2>
+        <h2><i aria-hidden="true" class="fas fa-history"></i> Round History</h2>
         ${renderRoundHistory(
             currentState.roundHistory,
             'Finish a round to see its bids, hands won, and scoring here.'
@@ -1177,10 +1237,10 @@ function renderGameplay(currentState) {
         ${currentRound <= 14 ? `
             <div class="flex-between">
             <div class="button-group">
-                 <button id="undo-round-btn" class="btn-outline"><i class="fas fa-undo-alt"></i> Undo Round</button>
-                 <button id="leave-game-btn" class="btn-leave-game"><i class="fas fa-sign-out-alt"></i> Leave</button>
-                 <button id="reset-game-btn" class="btn-red"><i class="fas fa-power-off"></i> Reset Game</button>
-                 <button id="handoff-qr-btn" class="btn-small"><i class="fas fa-qrcode"></i> Hand-off via QR</button>
+                 <button id="undo-round-btn" class="btn-outline"><i aria-hidden="true" class="fas fa-undo-alt"></i> Undo Round</button>
+                 <button id="leave-game-btn" class="btn-leave-game"><i aria-hidden="true" class="fas fa-sign-out-alt"></i> Leave</button>
+                 <button id="reset-game-btn" class="btn-red"><i aria-hidden="true" class="fas fa-power-off"></i> Reset Game</button>
+                 <button id="handoff-qr-btn" class="btn-small"><i aria-hidden="true" class="fas fa-qrcode"></i> Hand-off via QR</button>
             </div>
             <p>Round ${currentRound} / 14</p>
             </div>
@@ -1195,20 +1255,20 @@ function renderCompletedGames() {
         .filter(entry => entry.game.mode === undefined || entry.game.mode === null || entry.game.mode === 'offline');
 
     if (entries.length === 0) {
-        completedGamesList.innerHTML = '<div class="no-games"><i class="fas fa-folder-open"></i> No completed games yet</div>';
+        completedGamesList.innerHTML = '<div class="no-games"><i aria-hidden="true" class="fas fa-folder-open"></i> No completed games yet</div>';
         return;
     }
 
     completedGamesList.innerHTML = entries.slice().reverse().map(({ game, index }) => {
         game.eliminatedPlayers = game.eliminatedPlayers || [];
         const allParticipants = [...new Set([...(game.players || []), ...game.eliminatedPlayers])];
-        const elimCount = game.eliminatedPlayers.length ? `<span style="color: var(--danger)"><i class="fas fa-user-slash"></i> ${game.eliminatedPlayers.length}</span>` : '';
-        return `<div class="completed-game-item" data-game-index="${index}">
-                        <div><i class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
-                        <div class="game-winner"><i class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
-                        <div class="game-score"><i class="fas fa-star"></i> ${escapeHtml(game.score)} points</div>
+        const elimCount = game.eliminatedPlayers.length ? `<span style="color: var(--danger)"><i aria-hidden="true" class="fas fa-user-slash"></i> ${game.eliminatedPlayers.length}</span>` : '';
+        return `<div class="completed-game-item" data-game-index="${index}" role="button" tabindex="0">
+                        <div><i aria-hidden="true" class="fas fa-calendar-alt"></i> ${new Date(game.date).toLocaleDateString()} ${new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
+                        <div class="game-winner"><i aria-hidden="true" class="fas fa-trophy"></i> ${game.winners.map(escapeHtml).join(' & ')}</div>
+                        <div class="game-score"><i aria-hidden="true" class="fas fa-star"></i> ${escapeHtml(game.score)} points</div>
                         <div style="font-size: 0.8rem;">
-                        <i class="fas fa-users"></i> ${allParticipants.length} Players ${elimCount ? `(${elimCount} Eliminated)` : ''}
+                        <i aria-hidden="true" class="fas fa-users"></i> ${allParticipants.length} Players ${elimCount ? `(${elimCount} Eliminated)` : ''}
                         </div>
                     </div>`;
     }).join('');
@@ -1254,6 +1314,12 @@ function addPlayerOffline() {
     let playerName = playerNameInput.value.trim();
     if (playerName.length > 0) playerName = playerName.charAt(0).toUpperCase() + playerName.slice(1);
 
+    if (playerName && isReservedKey(playerName)) {
+        alert(`"${playerName}" can't be used as a player name.`);
+        playerNameInput.select();
+        return;
+    }
+
     if (playerName && !offlineState.players.includes(playerName)) {
         if (offlineState.players.length >= MAX_PLAYERS) { alert(`Maximum of ${MAX_PLAYERS} players allowed.`); return; }
         offlineState.players.push(playerName);
@@ -1265,7 +1331,7 @@ function addPlayerOffline() {
         saveOfflineState();
         renderApp();
     } else if (offlineState.players.includes(playerName)) {
-        alert(`Player "${escapeHtml(playerName)}" already exists!`);
+        alert(`Player "${playerName}" already exists!`);
         playerNameInput.select();
     } else {
         playerNameInput.focus();
@@ -1466,16 +1532,19 @@ function undoRoundOffline() {
             });
 
             // Restore previous state values
-            offlineState.currentRound = prevState.currentRound;
-            offlineState.bids = prevState.bids;
-            offlineState.scores = prevState.scores;
-            offlineState.eliminatedPlayers = prevState.eliminatedPlayers; // Restore eliminated list
+            const previousEliminated = Array.isArray(prevState.eliminatedPlayers) ? prevState.eliminatedPlayers : [];
+            offlineState.currentRound = Number.isInteger(prevState.currentRound)
+                ? prevState.currentRound
+                : Math.max(1, offlineState.currentRound - 1);
+            offlineState.bids = isPlainObject(prevState.bids) ? prevState.bids : {};
+            offlineState.scores = isPlainObject(prevState.scores) ? prevState.scores : {};
+            offlineState.eliminatedPlayers = previousEliminated; // Restore eliminated list
 
             // Restore active players list based on who had scores in the previous state
             // and remove players who were only eliminated *after* that round
             const previousActivePlayers = Array.isArray(prevState.players)
                 ? prevState.players
-                : Object.keys(prevState.scores).filter(p => !prevState.eliminatedPlayers.includes(p));
+                : Object.keys(offlineState.scores).filter(p => !previousEliminated.includes(p));
             offlineState.players = [...previousActivePlayers];
 
             if (Number.isInteger(prevState.dealerIndex)) {
@@ -1694,116 +1763,6 @@ function hideEliminationBanner() {
     if (roundBanner) roundBanner.style.display = 'none';
 }
 
-function copyGameIdToClipboard(gameId, displayElement) {
-     if (!navigator.clipboard) { alert("Clipboard not available."); return; }
-     navigator.clipboard.writeText(gameId).then(() => {
-         const feedbackEl = displayElement.querySelector('.copy-feedback');
-         if (feedbackEl) {
-             feedbackEl.classList.add('visible');
-             setTimeout(() => feedbackEl.classList.remove('visible'), 1500);
-         }
-     }).catch(err => { console.error('Failed to copy:', err); alert('Copy failed.'); });
-}
-
-function showQRCode(gameId) {
-    const qrCodeModal = document.getElementById('qr-code-modal');
-    const qrCodeContainer = document.getElementById('qr-code-container');
-    const qrCodeClose = document.getElementById('qr-code-close');
-
-    // Clear previous QR code
-    qrCodeContainer.innerHTML = '';
-
-    // Generate a QR code with just the game ID as plain text
-    // This will allow the user to easily copy it after scanning
-    const qrData = gameId;
-
-    try {
-        // Generate QR code with qrcodejs
-        new QRCode(qrCodeContainer, {
-            text: qrData,
-            width: 250,
-            height: 250,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-        });
-
-        // Add game ID display and copy button below QR code
-        const infoContainer = document.createElement('div');
-        infoContainer.style.marginTop = '1rem';
-        infoContainer.style.textAlign = 'center';
-
-        // Game ID display
-        const gameIdDisplay = document.createElement('div');
-        gameIdDisplay.style.fontFamily = 'monospace';
-        gameIdDisplay.style.padding = '0.5rem';
-        gameIdDisplay.style.backgroundColor = 'var(--light-alt)';
-        gameIdDisplay.style.border = '1px solid var(--gray-light)';
-        gameIdDisplay.style.borderRadius = 'var(--radius)';
-        gameIdDisplay.style.marginBottom = '0.5rem';
-        gameIdDisplay.style.wordBreak = 'break-all';
-        gameIdDisplay.textContent = gameId;
-
-        // Copy button
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'btn-small';
-        copyBtn.innerHTML = '<i class="far fa-copy"></i> Copy Game ID';
-        copyBtn.style.margin = '0 auto';
-
-        // Feedback element
-        const feedbackEl = document.createElement('span');
-        feedbackEl.className = 'copy-feedback';
-        feedbackEl.id = `qr-copy-feedback-${gameId}`;
-        feedbackEl.textContent = 'Copied!';
-        feedbackEl.style.display = 'block';
-        feedbackEl.style.marginTop = '0.5rem';
-
-        // Add click handler for copy button
-        copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(gameId).then(() => {
-                feedbackEl.classList.add('visible');
-                setTimeout(() => feedbackEl.classList.remove('visible'), 1500);
-            }).catch(err => {
-                console.error('Failed to copy:', err);
-                alert('Copy failed.');
-            });
-        });
-
-        // Append elements
-        infoContainer.appendChild(gameIdDisplay);
-        infoContainer.appendChild(copyBtn);
-        infoContainer.appendChild(feedbackEl);
-        qrCodeContainer.appendChild(infoContainer);
-
-        // Update instructions
-        const instructionsDiv = document.querySelector('.qr-code-instructions');
-        if (instructionsDiv) {
-            instructionsDiv.innerHTML = `
-                Scan this QR code with your phone's camera or QR scanner app,<br>
-                or copy the game ID manually to join the game.
-            `;
-        }
-    } catch (err) {
-        console.error('Failed to generate QR code:', err);
-        qrCodeContainer.innerHTML = '<p>QR code generation failed. Please try again.</p>';
-    }
-
-    // Show modal
-    qrCodeModal.classList.add('active');
-
-    // Add close handler
-    qrCodeClose.onclick = function() {
-        qrCodeModal.classList.remove('active');
-    };
-
-    // Close on background click
-    qrCodeModal.onclick = function(e) {
-        if (e.target === qrCodeModal) {
-            qrCodeModal.classList.remove('active');
-        }
-    };
-}
-
 // --- Local History Management ---
 function readStoredHistory() {
     const stored = readStoredJSON(LOCAL_STORAGE_HISTORY_KEY);
@@ -1868,11 +1827,11 @@ function showGameDetails(gameIndex) {
     const sortedPlayers = getSortedPlayers(game.finalScores || {}, allParticipants);
 
     let content = `
-        <div class="game-date"><i class="fas fa-calendar-alt"></i> ${formattedDate}</div>
+        <div class="game-date"><i aria-hidden="true" class="fas fa-calendar-alt"></i> ${formattedDate}</div>
         <div class="game-details-winners">
         <h4>${game.winners.length === 1 ? 'Winner' : 'Winners (Tie)'}</h4>
         <div class="winner-names">
-            <i class="fas fa-crown"></i> ${game.winners.map(escapeHtml).join(' & ')}
+            <i aria-hidden="true" class="fas fa-crown"></i> ${game.winners.map(escapeHtml).join(' & ')}
             <span style="margin-left:auto;">${escapeHtml(game.score)} points</span>
         </div>
         </div>
@@ -1887,13 +1846,13 @@ function showGameDetails(gameIndex) {
         const playerScore = game.finalScores[player] || 0;
         content += `
         <div class="player-score-item ${isWinner ? 'winner' : ''} ${isEliminated ? 'eliminated' : ''}">
-            <span class="player-score-name">${index + 1}. ${escapeHtml(player)} ${isEliminated ? '<i class="fas fa-user-slash" title="Eliminated"></i>' : ''}</span>
+            <span class="player-score-name">${index + 1}. ${escapeHtml(player)} ${isEliminated ? '<i aria-hidden="true" class="fas fa-user-slash" title="Eliminated"></i>' : ''}</span>
             <span class="player-score-value">${escapeHtml(playerScore)}</span>
         </div>`;
     });
     content += `</div></div>
         <div style="margin-top: 1.5rem;">
-            <h4><i class="fas fa-history"></i> Round History</h4>
+            <h4><i aria-hidden="true" class="fas fa-history"></i> Round History</h4>
             ${renderRoundHistory(
                 game.roundHistory,
                 'Round-by-round details were not saved for this older game.'
@@ -1942,10 +1901,40 @@ function showHandoffImportNotice(message, type = 'success') {
     if (!handoffImportBanner) return;
     const icon = type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle';
     handoffImportBanner.className = `handoff-import-banner active ${type}`;
-    handoffImportBanner.innerHTML = `<i class="fas ${icon}"></i><span>${escapeHtml(message)}</span>`;
-    window.setTimeout(() => {
+    handoffImportBanner.innerHTML = `<i aria-hidden="true" class="fas ${icon}"></i><span>${escapeHtml(message)}</span>`;
+    window.clearTimeout(handoffNoticeTimer);
+    handoffNoticeTimer = window.setTimeout(() => {
         handoffImportBanner.classList.remove('active');
     }, 6000);
+}
+
+// Opening a hand-off link must not silently wipe a different game in progress.
+function confirmReplacingSavedGame(importedState) {
+    const saved = sanitizeGameState(readStoredJSON(LOCAL_STORAGE_OFFLINE_KEY));
+    if (!saved.gameStarted || saved.currentRound > 14 || saved.players.length < 2) return true;
+    if (JSON.stringify(saved) === JSON.stringify(importedState)) return true;
+    return confirm('This link contains a 14-High game. Replace the game in progress on this device?');
+}
+
+// Scripts only needed for Import from QR load on demand (the service worker
+// precaches them for offline use).
+const scriptLoads = new Map();
+
+function loadScriptOnce(src) {
+    if (!scriptLoads.has(src)) {
+        scriptLoads.set(src, new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = () => {
+                scriptLoads.delete(src);
+                script.remove();
+                reject(new Error(`Could not load ${src}`));
+            };
+            document.head.appendChild(script);
+        }));
+    }
+    return scriptLoads.get(src);
 }
 
 function setHandoffStatus(statusEl, message, type = 'info') {
@@ -2013,7 +2002,7 @@ function copyHandoffText(text, statusEl, label = 'Copied') {
     }
 
     navigator.clipboard.writeText(text).then(() => {
-        setHandoffStatus(statusEl, `${label} to clipboard.`, 'success');
+        setHandoffStatus(statusEl, `${label} copied to clipboard.`, 'success');
     }).catch(err => {
         console.error('Copy failed:', err);
         setHandoffStatus(statusEl, 'Copy failed. Select and copy the text manually.', 'error');
@@ -2064,30 +2053,56 @@ function collectHandoffQRFrame(text, transfer) {
     return { payload, received: count, count };
 }
 
+let handoffQREncoder = null;
+const handoffQRMatrices = new Map();
+
+function getHandoffQRMatrix(text) {
+    let matrix = handoffQRMatrices.get(text);
+    if (matrix) return matrix;
+    if (!handoffQREncoder) {
+        // Only qrcodejs's module matrix is used (see vendor/README.md). Skip its
+        // own canvas drawing and PNG export, which ran for every frame.
+        handoffQREncoder = new QRCode(document.createElement('div'), { width: 256, height: 256,
+            correctLevel: QRCode.CorrectLevel.M });
+        handoffQREncoder._oDrawing = { draw() {} };
+    }
+    handoffQREncoder.makeCode(text);
+    const model = handoffQREncoder._oQRCode;
+    const count = model.getModuleCount();
+    const dark = new Uint8Array(count * count);
+    for (let row = 0; row < count; row++) {
+        for (let col = 0; col < count; col++) dark[row * count + col] = model.isDark(row, col) ? 1 : 0;
+    }
+    matrix = { count, dark };
+    if (handoffQRMatrices.size >= 128) handoffQRMatrices.clear();
+    handoffQRMatrices.set(text, matrix);
+    return matrix;
+}
+
 function renderHandoffQRCode(container, text) {
     // qrcodejs does not draw a quiet zone. Render its matrix at whole-pixel
     // module sizes with the required four-module white border on every side.
-    const scratch = document.createElement('div');
-    const qr = new QRCode(scratch, { text, width: 256, height: 256,
-        correctLevel: QRCode.CorrectLevel.M });
-    const matrix = qr._oQRCode;
-    const count = matrix.getModuleCount();
+    const { count, dark } = getHandoffQRMatrix(text);
     const scale = 4;
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = (count + 8) * scale;
-    canvas.className = 'handoff-qr-image';
-    canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', 'Game transfer QR code');
+    const size = (count + 8) * scale;
+    let canvas = container.firstChild;
+    if (!(canvas instanceof HTMLCanvasElement) || !canvas.classList.contains('handoff-qr-image')) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'handoff-qr-image';
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', 'Game transfer QR code');
+        container.replaceChildren(canvas);
+    }
+    if (canvas.width !== size || canvas.height !== size) canvas.width = canvas.height = size;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, size, size);
     ctx.fillStyle = '#000000';
     for (let row = 0; row < count; row++) {
         for (let col = 0; col < count; col++) {
-            if (matrix.isDark(row, col)) ctx.fillRect((col + 4) * scale, (row + 4) * scale, scale, scale);
+            if (dark[row * count + col]) ctx.fillRect((col + 4) * scale, (row + 4) * scale, scale, scale);
         }
     }
-    container.replaceChildren(canvas);
 }
 
 function showHandoffQRModal() {
@@ -2100,21 +2115,24 @@ function showHandoffQRModal() {
     const close = () => {
         window.clearInterval(frameTimer);
         modal.classList.remove('active');
+        if (closeHandoffExport === close) closeHandoffExport = null;
     };
+    closeHandoffExport = close;
     closeBtn.onclick = close;
     modal.onclick = e => { if (e.target === modal) close(); };
 
-    // Get offline game state
-    let stateStr = localStorage.getItem(LOCAL_STORAGE_OFFLINE_KEY);
-    if (!stateStr) {
+    // Export the game on screen (the saved copy can lag behind if storage is full).
+    const fullState = currentMode === 'offline' && offlineState.gameStarted
+        ? offlineState
+        : readStoredJSON(LOCAL_STORAGE_OFFLINE_KEY);
+    if (!fullState) {
         container.innerHTML = '<p style="color:var(--danger);">No offline game to export.</p>';
         modal.classList.add('active');
         return;
     }
 
     try {
-        // Parse and compress the game state for QR export
-        const fullState = JSON.parse(stateStr);
+        // Compress the game state for QR export
         const handoff = buildHandoffPayload(fullState);
         JSON.parse(LZString.decompressFromEncodedURIComponent(handoff.compressed));
         const frames = buildHandoffQRFrames(handoff.rawPayload);
@@ -2154,14 +2172,14 @@ function showHandoffQRModal() {
         const copyLinkBtn = document.createElement('button');
         copyLinkBtn.type = 'button';
         copyLinkBtn.className = 'btn-small';
-        copyLinkBtn.innerHTML = '<i class="fas fa-link"></i> Copy Link';
+        copyLinkBtn.innerHTML = '<i aria-hidden="true" class="fas fa-link"></i> Copy Link';
         copyLinkBtn.addEventListener('click', () => copyHandoffText(handoff.importUrl, statusEl, 'Import link'));
         actions.appendChild(copyLinkBtn);
 
         const copyPayloadBtn = document.createElement('button');
         copyPayloadBtn.type = 'button';
         copyPayloadBtn.className = 'btn-small';
-        copyPayloadBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Import Data';
+        copyPayloadBtn.innerHTML = '<i aria-hidden="true" class="fas fa-copy"></i> Copy Import Data';
         copyPayloadBtn.addEventListener('click', () => copyHandoffText(handoff.rawPayload, statusEl, 'Import data'));
         actions.appendChild(copyPayloadBtn);
 
@@ -2169,7 +2187,7 @@ function showHandoffQRModal() {
             const shareBtn = document.createElement('button');
             shareBtn.type = 'button';
             shareBtn.className = 'btn-small';
-            shareBtn.innerHTML = '<i class="fas fa-share-alt"></i> Share';
+            shareBtn.innerHTML = '<i aria-hidden="true" class="fas fa-share-alt"></i> Share';
             shareBtn.addEventListener('click', () => {
                 navigator.share({
                     title: '14-High game hand-off',
@@ -2198,7 +2216,7 @@ function showHandoffQRModal() {
         console.error('QR generation error:', err);
         container.innerHTML = `
             <div style="text-align: center; color: var(--danger); padding: 1rem;">
-                <i class="fas fa-times-circle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                <i aria-hidden="true" class="fas fa-times-circle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                 <p><strong>QR code generation failed</strong></p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;">
                     Error: ${escapeHtml(err.message || 'Unknown error')}<br>
@@ -2309,6 +2327,7 @@ function finishHandoffImport(decodedText, options = {}) {
 // Serialize cleanup across close/reopen, including a pending camera prompt.
 let handoffScannerCleanup = Promise.resolve();
 let closeHandoffScanner = null;
+let closeHandoffExport = null;
 
 function showHandoffImportModal() {
     const modal = document.getElementById('handoff-import-modal');
@@ -2390,6 +2409,8 @@ function showHandoffImportModal() {
     startPromise = previousCleanup.then(async () => {
         if (closed) return;
         qrReaderDiv.innerHTML = '';
+        await loadScriptOnce(`vendor/html5-qrcode.min.js?v=${APP_VERSION}`).catch(err => console.warn(err));
+        if (closed) return;
         if (typeof Html5Qrcode === 'undefined') throw new Error('QR scanner could not load.');
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
             throw new Error('Camera access requires HTTPS and a supported browser.');

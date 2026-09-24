@@ -552,38 +552,27 @@
         .round-history-empty { margin: 0; color: var(--text-muted); text-align: center; padding: 0.9rem; }
         [data-theme="dark"] .round-history-item { background-color: var(--light); border-color: var(--border); }
         [data-theme="dark"] .round-history-item summary { background-color: var(--gray-dark); }
+        .toggle-switch input:focus-visible + .slider { box-shadow: var(--ring); }
+        .version-modal .close-btn:focus-visible { box-shadow: var(--ring); }
+        .round-history-item summary:focus-visible { outline-offset: -2px; }
     </style>
 </head>
 <body data-theme="light">
     <!-- Apply the saved theme before first paint (hash-allowed in the vercel.json CSP). -->
     <script>try{if(localStorage.getItem('theme')==='dark')document.body.setAttribute('data-theme','dark')}catch(e){}</script>
     <!-- Game Details Modal -->
-    <div id="game-details-modal" class="game-details-modal">
+    <div id="game-details-modal" class="game-details-modal" role="dialog" aria-modal="true" aria-label="Game details">
       <div class="game-details-content">
-        <button id="game-details-close" class="game-details-close" aria-label="Close game details"><i class="fas fa-times"></i></button>
+        <button id="game-details-close" class="game-details-close" aria-label="Close game details"><i aria-hidden="true" class="fas fa-times"></i></button>
         <div id="game-details-body"></div>
       </div>
     </div>
 
-    <!-- QR Code Modal -->
-    <div id="qr-code-modal" class="qr-code-modal">
-      <div class="qr-code-content">
-        <button id="qr-code-close" class="qr-code-close" aria-label="Close QR code"><i class="fas fa-times"></i></button>
-        <h3><i class="fas fa-qrcode"></i> Game QR Code</h3>
-        <div class="qr-code-container" id="qr-code-container"></div>
-        <div class="qr-code-text" id="qr-code-text"></div>
-        <button id="copy-qr-id-btn" class="btn-text">Copy Game ID</button>
-        <div class="qr-code-instructions">
-          Other players can scan this QR code with their phone to automatically join your game
-        </div>
-      </div>
-    </div>
-
     <!-- Hand-off QR Export Modal (for offline game state) -->
-    <div id="handoff-qr-modal" class="qr-code-modal">
+    <div id="handoff-qr-modal" class="qr-code-modal" role="dialog" aria-modal="true" aria-label="Hand-off game QR code">
       <div class="qr-code-content">
-        <button id="handoff-qr-close" class="qr-code-close" aria-label="Close hand-off QR"><i class="fas fa-times"></i></button>
-        <h3><i class="fas fa-qrcode"></i> Hand-off Game (QR)</h3>
+        <button id="handoff-qr-close" class="qr-code-close" aria-label="Close hand-off QR"><i aria-hidden="true" class="fas fa-times"></i></button>
+        <h3><i aria-hidden="true" class="fas fa-qrcode"></i> Hand-off Game (QR)</h3>
         <div class="qr-code-container" id="handoff-qr-container"></div>
         <div class="qr-code-instructions">
           On the receiving device, open 14-High and tap <strong>Import from QR</strong>. Keep its camera pointed here until the game opens inside the app.<br>
@@ -593,10 +582,10 @@
     </div>
 
     <!-- Hand-off QR Import Modal (for scanning QR) -->
-    <div id="handoff-import-modal" class="qr-code-modal">
+    <div id="handoff-import-modal" class="qr-code-modal" role="dialog" aria-modal="true" aria-label="Import game from QR">
       <div class="qr-code-content" style="max-width:450px;">
-        <button id="handoff-import-close" class="qr-code-close" aria-label="Close import QR"><i class="fas fa-times"></i></button>
-        <h3><i class="fas fa-qrcode"></i> Import Game from QR</h3>
+        <button id="handoff-import-close" class="qr-code-close" aria-label="Close import QR"><i aria-hidden="true" class="fas fa-times"></i></button>
+        <h3><i aria-hidden="true" class="fas fa-qrcode"></i> Import Game from QR</h3>
         <div style="font-size: 0.9rem; color: var(--gray); margin-bottom: 1rem; text-align: center;">
           Point the camera at the other device’s game QR code. Your game will open here automatically once all parts are scanned.
         </div>
@@ -608,27 +597,27 @@
 
     <div class="fixed-header"></div>
     <div class="hamburger-menu">
-        <button class="hamburger-btn" aria-label="Open menu" aria-controls="main-menu" aria-expanded="false"><i class="fas fa-bars"></i></button>
+        <button class="hamburger-btn" aria-label="Open menu" aria-controls="main-menu" aria-expanded="false"><i aria-hidden="true" class="fas fa-bars"></i></button>
         <div class="menu-content" id="main-menu" aria-hidden="true" inert>
             <div class="menu-header">
-                <button class="menu-close" aria-label="Close menu"><i class="fas fa-times"></i></button>
+                <button class="menu-close" aria-label="Close menu"><i aria-hidden="true" class="fas fa-times"></i></button>
             </div>
 
-            <div class="menu-item-header"><i class="fas fa-cog"></i> Settings</div>
+            <div class="menu-item-header"><i aria-hidden="true" class="fas fa-cog"></i> Settings</div>
             <div class="menu-item">
-                <span><i class="fas fa-moon"></i> Dark Mode</span>
+                <span><i aria-hidden="true" class="fas fa-moon"></i> Dark Mode</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="dark-mode-toggle" aria-label="Toggle dark mode">
                     <span class="slider"></span>
                 </label>
             </div>
-            <div class="menu-item menu-item-back-to-menu" id="menu-back-button" style="display: none;">
-                 <span><i class="fas fa-arrow-left"></i> Back to Start</span>
+            <div class="menu-item menu-item-back-to-menu" id="menu-back-button" role="button" tabindex="0" style="display: none;">
+                 <span><i aria-hidden="true" class="fas fa-arrow-left"></i> Back to Start</span>
             </div>
 
-            <div class="menu-item-header"><i class="fas fa-history"></i> Game History</div>
+            <div class="menu-item-header"><i aria-hidden="true" class="fas fa-history"></i> Game History</div>
             <div class="completed-games-list" id="completed-games-list">
-                <div class="no-games"><i class="fas fa-info-circle"></i> Loading history...</div>
+                <div class="no-games"><i aria-hidden="true" class="fas fa-info-circle"></i> Loading history...</div>
             </div>
         </div>
     </div>
@@ -636,38 +625,38 @@
     <div class="container">
         <h1>14-High!</h1>
         <div id="handoff-import-banner" class="handoff-import-banner" role="status" aria-live="polite"></div>
-        <div id="app">
+        <main id="app">
             <!-- Initial content: Mode Selection Screen -->
             <!-- Will be replaced by JS -->
-        </div>
+        </main>
     </div>
 
     <!-- Elimination notification banner (initially hidden) -->
     <div id="elimination-banner" class="elimination-banner" style="display: none;">
-        <i class="fas fa-exclamation-triangle"></i>
+        <i aria-hidden="true" class="fas fa-exclamation-triangle"></i>
         <span id="elimination-message">Upcoming elimination</span>
     </div>
 
     <!-- Version indicator -->
-    <div class="version-badge" id="version-badge">
-        <span>v2.5.1</span> <!-- Updated Version -->
+    <div class="version-badge" id="version-badge" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="version-modal">
+        <span>v2.6.0</span> <!-- Updated Version -->
     </div>
-    <div class="version-modal" id="version-modal">
+    <div class="version-modal" id="version-modal" role="dialog" aria-label="About 14-High!">
         <div class="version-title">
             <h3>14-High!</h3>
             <button class="close-btn" id="version-close" aria-label="Close version info">
-                <i class="fas fa-times"></i>
+                <i aria-hidden="true" class="fas fa-times"></i>
             </button>
         </div>
         <div class="version-info">
             <p><strong>Released:</strong> September 2026</p>
             <p><strong>What's New:</strong></p>
             <ul>
-                <li><i class="fas fa-gamepad"></i> Streamlined for fast local play.</li>
-                <li><i class="fas fa-user-slash"></i> Correct large-table eliminations in offline games.</li>
-                <li><i class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
-                <li><i class="fas fa-list-alt"></i> Review bids, hands won, and scoring for every completed round.</li>
-                <li><i class="fas fa-chart-line"></i> Privacy-limited usage analytics for gameplay milestones.</li>
+                <li><i aria-hidden="true" class="fas fa-gamepad"></i> Streamlined for fast local play.</li>
+                <li><i aria-hidden="true" class="fas fa-user-slash"></i> Correct large-table eliminations in offline games.</li>
+                <li><i aria-hidden="true" class="fas fa-hdd"></i> Progress saved automatically in the browser.</li>
+                <li><i aria-hidden="true" class="fas fa-list-alt"></i> Review bids, hands won, and scoring for every completed round.</li>
+                <li><i aria-hidden="true" class="fas fa-chart-line"></i> Privacy-limited usage analytics for gameplay milestones.</li>
                 <li>Includes history, dark mode, and QR hand-off tools.</li>
                 <li>Clearer QR codes transfer the full game inside the app, including offline.</li>
                 <li>Author: Mark Heinonen</li>
@@ -676,9 +665,8 @@
             </ul>
         </div>
     </div>
-    <script src="vendor/lz-string.min.js"></script>
-    <script src="vendor/qrcode.min.js"></script>
-    <script src="vendor/html5-qrcode.min.js"></script>
+    <script src="vendor/lz-string.min.js?v=2.6.0"></script>
+    <script src="vendor/qrcode.min.js?v=2.6.0"></script>
     <script src="app.js?v=2.6.0"></script>
 </body>
 </html>
