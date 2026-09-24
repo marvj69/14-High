@@ -24,6 +24,8 @@ const state = {
 };
 try {
   const senderContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  // Keep test runs out of the production analytics property.
+  await senderContext.route(/googletagmanager\.com|google-analytics\.com/, route => route.abort());
   const sender = await senderContext.newPage();
   sender.on('pageerror', error => errors.push(error.message));
   await sender.goto(baseURL, { waitUntil: 'domcontentloaded' });
@@ -47,6 +49,7 @@ try {
   await sender.getByRole('button', { name: 'Close hand-off QR', exact: true }).click();
 
   const receiverContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await receiverContext.route(/googletagmanager\.com|google-analytics\.com/, route => route.abort());
   // Only replace the camera hardware. Production QR renderer, video scanner,
   // decoder, frame collection, import, persistence and UI all run unchanged.
   await receiverContext.addInitScript(images => {

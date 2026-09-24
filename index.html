@@ -556,10 +556,14 @@
         .toggle-switch input:focus-visible + .slider { box-shadow: var(--ring); }
         .version-modal .close-btn:focus-visible { box-shadow: var(--ring); }
         .round-history-item summary:focus-visible { outline-offset: -2px; }
+        /* Until the start-up script at the end of <body> runs, show only the background, so the
+           header and the game appear together even when the page arrives in pieces. (It reveals
+           the page and renders the app in one script run, so no frame can show one without the other.) */
+        body[data-booting] > * { visibility: hidden; }
     </style>
     <script src="app.js?v=2.6.0"></script>
 </head>
-<body data-theme="light">
+<body data-theme="light" data-booting>
     <!-- Apply the saved theme before first paint (hash-allowed in the vercel.json CSP). -->
     <script>try{if(localStorage.getItem('theme')==='dark')document.body.setAttribute('data-theme','dark')}catch(e){}</script>
     <!-- Game Details Modal -->
@@ -667,6 +671,6 @@
             </ul>
         </div>
     </div>
-    <script>initializeApp();</script>
+    <script>document.body.removeAttribute('data-booting');initializeApp();</script>
 </body>
 </html>

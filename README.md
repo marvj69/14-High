@@ -79,7 +79,7 @@ Being a purely static web app, 14-High! can be deployed to any web hosting servi
 
 ### Project Layout
 
-- `index.html` — markup and styles, plus two one-line inline scripts: one applies the saved theme, the other starts the app at the end of `<body>` so the first paint already shows the game.
+- `index.html` — markup and styles, plus two one-line inline scripts: one applies the saved theme, the other reveals the page (`data-booting`) and starts the app in one step at the end of `<body>`, so the header and the game always appear together.
 - `app.js` — all application code (loaded in `<head>` with a `?v=` version query). The QR libraries load on demand.
 - `service-worker.js` — offline caching.
 - `vercel.json` — security headers, including the Content-Security-Policy.
